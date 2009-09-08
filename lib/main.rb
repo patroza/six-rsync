@@ -19,11 +19,55 @@ Just 2 lists to maintain :O unpacked and packed :O
 
 =end
 
-
+require 'log4r'
 require 'six/rsync'
+
+COMPONENT = 'six-rsync'
+
+# Create loggers
+log = Log4r::Logger.new(COMPONENT)
+format1 = Log4r::PatternFormatter.new(:pattern => "[%l] %d: %m", :date_pattern => '%H:%M:%S')
+format2 = Log4r::PatternFormatter.new(:pattern => "[%l] %c %d: %m", :date_pattern => '%H:%M:%S')
+
+if not defined?(Ocra)
+  # Create Outputters
+  o_file = Log4r::FileOutputter.new "#{COMPONENT}-file",
+    'level' => 0, # All
+  :filename => "#{COMPONENT}.log",
+    'formatter' =>  format2
+  #:maxsize => 1024
+
+  log.outputters << o_file
+
+  o_out = Log4r::StdoutOutputter.new "#{COMPONENT}-stdout",
+    'level' => 2, # no DEBUG
+  'formatter' =>  format1
+
+  o_err = Log4r::StderrOutputter.new "#{COMPONENT}-stderr",
+    'level' => 4, # Error and Up
+  'formatter' =>  format1
+
+  log.outputters << o_out << o_err
+end
+
+#sync_remote('rsync://git.dev-heaven.net/rel/caa1', 'C:/temp/temp')
+include Six::Repositories
+
+host = "C:/temp/rsync/folder1/."
+dir = "C:/temp/rsync"
+log.info "Test"
+
+rs = Rsync.clone(host, 'folder2', :path => dir, :log => log)
+#rs = Rsync.open(dir)
+p rs
+
+
 module Six
-  module Rsync
-    sync_remote('rsync://git.dev-heaven.net/rel/caa1', 'C:/temp/temp')
+  module Repositories
+    module Rsync
+      
+    end
+
   end
 end
 
