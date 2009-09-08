@@ -1,0 +1,6 @@
+*.log
+doc/
+nbproject/private
+*.yml
+*.txt
+lib/tools
