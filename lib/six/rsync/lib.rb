@@ -5,9 +5,14 @@ module Six
       end
 
       class Lib
+        PROTECTED = true
         DEFAULT = Hash.new
         DEFAULT[:hosts] = []
-        PARAMS = "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+        PARAMS = if PROTECTED
+          "--dry-run --times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+        else
+          "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+        end
         WINDRIVE = / (\w)\:/
 
         def initialize(base = nil, logger = nil)
@@ -26,39 +31,114 @@ module Six
         end
 
         def init
-          File.open(File.join(@rsync_dir, '.rsync', '.config'), 'w') do |file|
-            file.puts DEFAULT.to_yaml
+          unless FileTest.exist? rsync_path
+            @logger.error "Seems to already be an Rsync repository!"
+            return
           end
+          FileUtils.mkdir_p rsync_path
+          write_config(config)
+        end
+
+        def config
+          @config ||= DEFAULT.clone
         end
 
         def clone(repository, name, opts = {})
           @path = opts[:path] || '.'
-          clone_dir = opts[:path] ? File.join(@path, name) : name
+          @rsync_dir = opts[:path] ? File.join(@path, name) : name
+
+          case repository
+          when Array
+            config[:hosts] += repository
+          when String
+            config[:hosts] << repository
+          end
+
+          init
+
+          # TODO: Eval move to update?
+          arr_opts = []
+          arr_opts << "-I" if opts[:force]
+
+          update('', arr_opts)
+
+          opts[:bare] ? {:repository => @rsync_dir} : {:working_directory => @rsync_dir}
+        end
+
+        def update(cmd, x_opts = [])
+          @config = read_config
+          unless @config
+            @logger.error "Not an Rsync repository!"
+            return
+          end
+
+          p config
+          unless config[:hosts].size > 0
+            @logger.error "No hosts configured!"
+            return
+          end
 
           arr_opts = []
           arr_opts << PARAMS
-          arr_opts << "-I" if opts[:force]
+          arr_opts += x_opts
+          arr_opts << config[:hosts].sample
+          arr_opts << @rsync_dir
 
-          arr_opts << repository
-          arr_opts << clone_dir
-
-          command('', arr_opts)
-
-          opts[:bare] ? {:repository => clone_dir} : {:working_directory => clone_dir}
+          command(cmd, arr_opts)
         end
 
         private
+        def rsync_path
+          File.join(@rsync_dir, '.rsync')
+        end
+
+        def read_config
+          read_yaml(File.join(rsync_path, 'config.yml'))
+        end
+
+        def read_sums
+          read_yaml(File.join(rsync_path, 'sums.yml'))
+        end
+
+        def read_yaml(file)
+          if FileTest.exist?(file)
+            YAML::load_file(file)
+          else
+            nil
+          end          
+        end
+
+        def write_default_config
+          FileUtils.mkdir_p rsync_path
+          write_config(config)
+        end
+
+        def write_sums
+          sums = Hash.new
+          Dir[File.join(@rsync_dir, '**/*')].each do |file|
+            relative = file.gsub(/#{@rsync_dir}[\\|\/]/, '')
+            sums[relative] = Digest::MD5.hexdigest(File.read(file))
+          end
+
+          File.open(File.join(rsync_path, 'sums.yml'), 'w') do |file|
+            file.puts sums.to_yaml
+          end
+        end
+
+        def write_config(config = DEFAULT)
+          File.open(File.join(rsync_path, '.config'), 'w') do |file|
+            file.puts config.to_yaml
+          end
+        end
 
         def command_lines(cmd, opts = [], chdir = true, redirect = '')
           command(cmd, opts, chdir).split("\n")
         end
 
         def command(cmd, opts = [], chdir = true, redirect = '', &block)
-          #ENV['GIT_DIR'] = @rsync_dir
-          #ENV['GIT_WORK_TREE'] = @rsync_work_dir
           path = @rsync_work_dir || @rsync_dir || @path
 
-          opts = [opts].flatten.map {|s| s }.join(' ') #wescape()
+          opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]

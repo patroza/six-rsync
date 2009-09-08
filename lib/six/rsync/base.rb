@@ -58,7 +58,6 @@ module Six
           self.new(Rsync::Lib.new(nil, logger).clone(repository, name, opts))
         end
 
-
         def initialize(options = {})
           @repository = repository
 
@@ -72,6 +71,10 @@ module Six
           else
             @logger = nil
           end
+        end
+
+        def update
+          
         end
 
         # returns a reference to the working directory

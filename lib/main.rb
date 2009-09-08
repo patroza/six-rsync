@@ -40,7 +40,7 @@ if not defined?(Ocra)
   log.outputters << o_file
 
   o_out = Log4r::StdoutOutputter.new "#{COMPONENT}-stdout",
-    'level' => 2, # no DEBUG
+    'level' => 0,  #2, # no DEBUG
   'formatter' =>  format1
 
   o_err = Log4r::StderrOutputter.new "#{COMPONENT}-stderr",

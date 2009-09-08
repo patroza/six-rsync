@@ -1,8 +1,23 @@
+require 'fileutils'
+require 'digest/md5'
+
 require 'six/rsync/lib'
 require 'six/rsync/base'
 
+if RUBY_VERSION == "1.8.7"
+  class Array
+    def sample
+      idx = rand(self.size - 1)
+      self[idx]
+    end
+  end
+end
+
 module Six
   module Repositories
+    module Md5
+    end
+
     module Rsync
       VERSION = '0.0.1'
       BASE_PATH = Dir.pwd
