@@ -5,9 +5,10 @@ module Six
       end
 
       class Lib
-        PROTECTED = true
-        DEFAULT = Hash.new
-        DEFAULT[:hosts] = []
+        PROTECTED = false
+        tmp = Hash.new
+        tmp[:hosts] = []
+        DEFAULT = tmp.to_yaml
         PARAMS = if PROTECTED
           "--dry-run --times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
         else
@@ -33,20 +34,29 @@ module Six
         def init
           p rsync_path
           if FileTest.exist? rsync_path
-            @logger.error "Seems to already be an Rsync repository!"
+            @logger.error "Seems to already be an Rsync repository, Aborting!"
             raise RsyncExecuteError
+            #return
+          end
+          if FileTest.exist? @rsync_work_dir
+            @logger.error "Seems to already be a folder, Aborting!"
+            raise RsyncExecuteError
+            #return
           end
           FileUtils.mkdir_p rsync_path
           write_config(config)
         end
 
         def config
-          @config ||= DEFAULT.clone
+          @config ||= YAML::load(DEFAULT)
         end
 
         def clone(repository, name, opts = {})
           @path = opts[:path] || '.'
           @rsync_work_dir = opts[:path] ? File.join(@path, name) : name
+          if opts[:log]
+            @logger = opts[:log]
+          end
 
           case repository
           when Array
@@ -62,9 +72,17 @@ module Six
             arr_opts = []
             arr_opts << "-I" if opts[:force]
 
-            update('', arr_opts)
+            begin
+              update('', arr_opts)
+            rescue
+              @logger.error "Unable to sucessfully update, aborting..."
+              # Dangerous? :D
+              FileUtils.rm_rf @rsync_work_dir
+            end
           rescue
+            @logger.error "Unable to initialize"
           end
+
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
 
@@ -128,7 +146,7 @@ module Six
           end
         end
 
-        def write_config(config = DEFAULT)
+        def write_config(config = YAML::load(DEFAULT))
           File.open(File.join(rsync_path, 'config.yml'), 'w') do |file|
             file.puts config.to_yaml
           end

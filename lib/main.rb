@@ -1,5 +1,7 @@
 =begin
-  2 methods:
+  7za.exe can be used to unpack the gzips!
+
+2 methods:
   a) Put the modfolder into a .7z, distribute this .7z together with the updater. The updater will unpack it, and then rsync future updates, with uncompressed files.
   b) Put each addon in an --rsyncable gzip, initial installation and future updates happen over rsync, with .gz files.
 
@@ -53,6 +55,7 @@ end
 #sync_remote('rsync://git.dev-heaven.net/rel/caa1', 'C:/temp/temp')
 include Six::Repositories
 
+=begin
 host = "C:/temp/rsync/folder1/."
 dir, folder = "C:/temp/rsync", 'folder2'
 log.info "Test"
@@ -60,7 +63,29 @@ log.info "Test"
 rs = Rsync.open(File.join(dir,folder), :log => log)
 rs.update
 p rs
+=end
 
+dir = "C:/temp/rsync"
+host = "rsync://dev-heaven.net/rel"
+repositories = ["cba", "ace", "acex", "six", "beta", "caa1"]
+repositories.each do |r|
+  url = File.join(host, r, '/.')
+  Rsync.clone(url, r, :path => dir, :log => log)
+
+  rs = Rsync.open(File.join(dir, r), :log => log)
+  rs.update
+  p rs
+end
+=begin
+repositories.each do |r|
+  url = File.join(host, r, '/.')
+  begin
+    Rsync.clone(url, r, :path => dir, :log => log)
+  rescue
+    log.error "Survived exception!"
+  end
+end
+=end
 #rs = Rsync.clone(host, folder, :path => dir, :log => log)
 #rs = Rsync.open(dir)
 
