@@ -48,33 +48,33 @@ module Six
         #    :working_directory
         #    :index_file
         #
-        def self.clone(repository, name, opts = {})
+        def self.clone(host, name, opts = {})
           # run Rsync clone
           logger = if opts[:log]
             opts[:log]
           else
             nil
           end
-          self.new(Rsync::Lib.new(nil, logger).clone(repository, name, opts))
+          self.new(Rsync::Lib.new(nil, logger).clone(host, name, opts))
         end
 
         def initialize(options = {})
-          @repository = repository
-
           if working_dir = options[:working_directory]
             options[:repository] ||= File.join(working_dir, '.rsync')
           end
-
           if options[:log]
             @logger = options[:log]
             @logger.info("Starting Rsync")
           else
             @logger = nil
           end
+          @working_directory = options[:working_directory] ? Rsync::WorkingDirectory.new(options[:working_directory]) : nil
+          @repository = options[:repository] ? Rsync::Repository.new(options[:repository]) : nil
+
         end
 
         def update
-          
+          lib.update('')
         end
 
         # returns a reference to the working directory
@@ -128,7 +128,7 @@ module Six
         # actual 'git' forked system calls.  At some point I hope to replace the Git::Lib
         # class with one that uses native methods or libgit C bindings
         def lib
-          @lib ||= Git::Lib.new(self, @logger)
+          @lib ||= Rsync::Lib.new(self, @logger)
         end
     
       end

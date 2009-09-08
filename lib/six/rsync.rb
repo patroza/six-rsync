@@ -1,6 +1,9 @@
 require 'fileutils'
 require 'digest/md5'
 
+require 'six/rsync/path'
+require 'six/rsync/repository'
+require 'six/rsync/working_directory'
 require 'six/rsync/lib'
 require 'six/rsync/base'
 

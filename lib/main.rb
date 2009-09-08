@@ -54,13 +54,15 @@ end
 include Six::Repositories
 
 host = "C:/temp/rsync/folder1/."
-dir = "C:/temp/rsync"
+dir, folder = "C:/temp/rsync", 'folder2'
 log.info "Test"
 
-rs = Rsync.clone(host, 'folder2', :path => dir, :log => log)
-#rs = Rsync.open(dir)
+rs = Rsync.open(File.join(dir,folder), :log => log)
+rs.update
 p rs
 
+#rs = Rsync.clone(host, folder, :path => dir, :log => log)
+#rs = Rsync.open(dir)
 
 module Six
   module Repositories

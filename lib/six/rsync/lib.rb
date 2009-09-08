@@ -22,18 +22,19 @@ module Six
 
           if base.is_a?(Rsync::Base)
             @rsync_dir = base.repo.path
-            #@rsync_work_dir = base.dir.path if base.dir
+            @rsync_work_dir = base.dir.path if base.dir
           elsif base.is_a?(Hash)
             @rsync_dir = base[:repository]
-            #@rsync_work_dir = base[:working_directory]
+            @rsync_work_dir = base[:working_directory]
           end
           @logger = logger
         end
 
         def init
-          unless FileTest.exist? rsync_path
+          p rsync_path
+          if FileTest.exist? rsync_path
             @logger.error "Seems to already be an Rsync repository!"
-            return
+            raise RsyncExecuteError
           end
           FileUtils.mkdir_p rsync_path
           write_config(config)
@@ -45,7 +46,7 @@ module Six
 
         def clone(repository, name, opts = {})
           @path = opts[:path] || '.'
-          @rsync_dir = opts[:path] ? File.join(@path, name) : name
+          @rsync_work_dir = opts[:path] ? File.join(@path, name) : name
 
           case repository
           when Array
@@ -54,15 +55,17 @@ module Six
             config[:hosts] << repository
           end
 
-          init
+          begin
+            init
 
-          # TODO: Eval move to update?
-          arr_opts = []
-          arr_opts << "-I" if opts[:force]
+            # TODO: Eval move to update?
+            arr_opts = []
+            arr_opts << "-I" if opts[:force]
 
-          update('', arr_opts)
-
-          opts[:bare] ? {:repository => @rsync_dir} : {:working_directory => @rsync_dir}
+            update('', arr_opts)
+          rescue
+          end
+          opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
 
         def update(cmd, x_opts = [])
@@ -82,14 +85,14 @@ module Six
           arr_opts << PARAMS
           arr_opts += x_opts
           arr_opts << config[:hosts].sample
-          arr_opts << @rsync_dir
+          arr_opts << @rsync_work_dir
 
           command(cmd, arr_opts)
         end
 
         private
         def rsync_path
-          File.join(@rsync_dir, '.rsync')
+          File.join(@rsync_work_dir, '.rsync')
         end
 
         def read_config
@@ -115,8 +118,8 @@ module Six
 
         def write_sums
           sums = Hash.new
-          Dir[File.join(@rsync_dir, '**/*')].each do |file|
-            relative = file.gsub(/#{@rsync_dir}[\\|\/]/, '')
+          Dir[File.join(@rsync_work_dir, '**/*')].each do |file|
+            relative = file.gsub(/#{@rsync_work_dir}[\\|\/]/, '')
             sums[relative] = Digest::MD5.hexdigest(File.read(file))
           end
 
@@ -126,7 +129,7 @@ module Six
         end
 
         def write_config(config = DEFAULT)
-          File.open(File.join(rsync_path, '.config'), 'w') do |file|
+          File.open(File.join(rsync_path, 'config.yml'), 'w') do |file|
             file.puts config.to_yaml
           end
         end
