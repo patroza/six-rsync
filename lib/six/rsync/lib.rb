@@ -8,6 +8,7 @@ module Six
         DEFAULT = Hash.new
         DEFAULT[:hosts] = []
         PARAMS = "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+        WINDRIVE = / (\w)\:/
 
         def initialize(base = nil, logger = nil)
           @rsync_dir = nil
@@ -59,8 +60,8 @@ module Six
 
           opts = [opts].flatten.map {|s| s }.join(' ') #wescape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
-          while rsync_cmd[/ (\w)\:/] do
-            drive = rsync_cmd[/ (\w)\:/]
+          while rsync_cmd[WINDRIVE] do
+            drive = rsync_cmd[WINDRIVE]
             rsync_cmd.gsub!(drive, " /cygdrive/#{$1}")
           end
 

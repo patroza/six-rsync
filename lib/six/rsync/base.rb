@@ -25,7 +25,12 @@ module Six
           FileUtils.mkdir_p(opts[:working_directory]) if opts[:working_directory] && !File.directory?(opts[:working_directory])
 
           # run rsync_init there
-          Rsync::Lib.new(opts).init
+          logger = if opts[:log]
+            opts[:log]
+          else
+            nil
+          end
+          Rsync::Lib.new(opts, logger).init
 
           self.new(opts)
         end
@@ -45,7 +50,12 @@ module Six
         #
         def self.clone(repository, name, opts = {})
           # run Rsync clone
-          self.new(Rsync::Lib.new.clone(repository, name, opts))
+          logger = if opts[:log]
+            opts[:log]
+          else
+            nil
+          end
+          self.new(Rsync::Lib.new(nil, logger).clone(repository, name, opts))
         end
 
 
