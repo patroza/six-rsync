@@ -75,7 +75,6 @@ repositories.each do |r|
 
   rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   rs.update
-  p rs
 end
 =begin
 repositories.each do |r|

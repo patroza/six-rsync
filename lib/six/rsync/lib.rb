@@ -32,7 +32,7 @@ module Six
         end
 
         def init
-          p rsync_path
+          puts "Processing: #{rsync_path}"
           if FileTest.exist? rsync_path
             @logger.error "Seems to already be an Rsync repository, Aborting!"
             raise RsyncExecuteError
@@ -93,16 +93,15 @@ module Six
             return
           end
 
-          p config
           unless config[:hosts].size > 0
             @logger.error "No hosts configured!"
             return
           end
 
-          unpack
+          #unpack
           write_sums
           # fetch latest sums
-          # compare_sums
+          compare_sums
           # only update whne sums mismatch
           
           return
@@ -116,37 +115,36 @@ module Six
           command(cmd, arr_opts)
         end
 
-        def unpack
-          #Dir[File.join(@rsync_work_dir, '**/*')].each do |file|
-          #  relative = file.gsub(/#{@rsync_work_dir}[\\|\/]/, '')
-          #  sum = md5(file)
-          #  sums_wd[relative] = sum if sum
-          #end
-          #File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
+        def unpack_file(file, path)
+          Dir.chdir(path) do |dir|
+            system "7za x \"#{file}\" -y"
+            if file[/\.tar\.?/]
+              f2 = fil.gsub('.gz', '')
+              system "7za x \"#{f2}\" -y"
+              FileUtils.rm_f f2
+            end
+          end
+        end
 
-          Dir[File.join(@rsync_work_dir, '.pack/**/*')].each do |file|
+        def unpack(opts = {})
+          items = if opts[:path]
+            File.join(@rsync_work_dir, '.pack', opts[:path])
+          else
+            Dir[File.join(@rsync_work_dir, '.pack/**/*')]
+          end
+
+          items.each do |file|
             unless File.directory? file
               relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
               fil = relative
               folder = "."
-              if relative[/(.*)\/(.*)/]
-                folder, fil = $1, $2
-              end
+              folder, fil = $1, $2 if relative[/(.*)\/(.*)/]
+
               path = File.join(@rsync_work_dir, folder)
               FileUtils.mkdir_p path
-              Dir.chdir(path) do |dir|
-                p "7za x \"#{file}\" -y"
-                system "7za x \"#{file}\" -y"
-                if file[/\.tar\.?/]
-                  f2 = fil.gsub('.gz', '')
-                  p f2
-                  system "7za x \"#{f2}\" -y"
-                  FileUtils.rm_f f2
-                end
-              end
+              unpack_file(file, path)
             end
           end
-
         end
 
         private
@@ -193,6 +191,8 @@ module Six
             sums_pack[rel] = sum if sum
           end
           File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
+          #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
+          #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
         end
 
         def fetch_file(file)
@@ -240,9 +240,23 @@ module Six
                 # TODO: Update file e
                 # TODO: Unpack file e to wd, function pack to wd
               end
-              write_sums
             end
+
+            pack_del = []
+            local[:pack].each_pair do |key, value|
+              if value == remote[:pack][key]
+                #puts "Match! #{key}"
+              else
+                puts "Mismatch! #{key}"
+                pack_del << key
+              end
+            end
+            puts "To delete #{wd_del}"
+            pack_del.each { |e| del_pack_file(e) }
           end
+
+          # TODO: Split up the pack and wd sum calcs
+          write_sums
 
           # TODO: Update the sums now first
           File.open(File.join(@rsync_dir, 'sums_wd.yml')) do |file|
@@ -274,16 +288,32 @@ module Six
               end
             end
             if wd.size > 0
-              wd.each do |e|
-                # Update file e
-                # Unpack file e to wd, function pack to wd
-              end
-              write_sums
+              wd.each { |e| unpack(:path => "#{e}.gz") }
             end
+
+            wd_del = []
+            local[:wd].each_pair do |key, value|
+              if value == remote[:wd][key]
+                #puts "Match! #{key}"
+              else
+                puts "Mismatch! #{key}"
+                wd_del << key
+              end
+            end
+            puts "To delete #{wd_del}"
+            wd_del.each { |e| del_wd_file(e) }
           end
+          write_sums
+          # TODO: Verify again?
 
-          # TODO: Update the sum files again if updated :D
+        end
 
+        def del_wd_file(file, opts = {})
+          FileUtils.rm_f File.join(@rsync_work_dir, file)
+        end
+
+        def del_pack_file(file, opts = {})
+          FileUtils.rm_f File.join(@rsync_work_dir, '.pack', file)
         end
 
         def md5(file)

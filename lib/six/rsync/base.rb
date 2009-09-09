@@ -64,7 +64,7 @@ module Six
           end
           if options[:log]
             @logger = options[:log]
-            @logger.info("Starting Rsync")
+            @logger.debug("Starting Rsync on #{working_dir}")
           else
             @logger = nil
           end
