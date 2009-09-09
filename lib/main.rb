@@ -43,7 +43,7 @@ if not defined?(Ocra)
   log.outputters << o_file
 
   o_out = Log4r::StdoutOutputter.new "#{COMPONENT}-stdout",
-    'level' => 0,  #2, # no DEBUG
+    'level' => 2, # no DEBUG
   'formatter' =>  format1
 
   o_err = Log4r::StderrOutputter.new "#{COMPONENT}-stderr",
@@ -67,13 +67,16 @@ p rs
 =end
 
 dir = "C:/games/arma2"
+#dir = "C:/packaging/rsync"
 host = "rsync://dev-heaven.net/rel"
 repositories = ["cba", "ace", "acex", "six", "beta"] #, "caa1"]
 repositories.each do |r|
   url = File.join(host, r, '/.')
   #Rsync.clone(url, "@#{r}test", :path => dir, :log => log)
 
+  #rs = Rsync.open(File.join(dir, r), :log => log)
   rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
+  #rs.reset(:hard => true)
   rs.update
 end
 =begin
@@ -92,7 +95,6 @@ end
 module Six
   module Repositories
     module Rsync
-      
     end
 
   end

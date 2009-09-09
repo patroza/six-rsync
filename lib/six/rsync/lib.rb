@@ -74,7 +74,6 @@ module Six
 
             begin
               update('', arr_opts)
-              write_sums
             rescue
               @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
@@ -87,7 +86,7 @@ module Six
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
 
-        def update(cmd, x_opts = [])
+        def update(cmd, x_opts = [], opts = {})
           @config = read_config
           unless @config
             @logger.error "Not an Rsync repository!"
@@ -99,24 +98,36 @@ module Six
             return
           end
 
-          write_sums
-          # fetch latest sums
-          compare_sums
-          # only update whne sums mismatch
-          
-          return
+          #unpack
 
-          arr_opts = []
-          arr_opts << PARAMS
-          arr_opts += x_opts
+          if opts[:force]
+            arr_opts = []
+            arr_opts << PARAMS
+            arr_opts += x_opts
 
-          # TODO: UNCLUSTERFUCK
-          arr_opts << File.join(config[:hosts].sample, '.pack/.')
-          arr_opts << File.join(@rsync_work_dir, '.pack')
+            # TODO: UNCLUSTERFUCK
+            arr_opts << File.join(config[:hosts].sample, '.pack/.')
+            arr_opts << File.join(@rsync_work_dir, '.pack')
 
-          command(cmd, arr_opts)
+            command(cmd, arr_opts)
+            write_sums
+          else
+            #reset(:hard => true)
+            write_sums
+
+            # fetch latest sums and only update when changed
+            compare_sums
+          end          
         end
 
+        def reset(opts = {})
+          puts "Restting!"
+          if opts[:hard]
+            compare_sums(false)
+          end
+        end
+
+        private
         def unpack_file(file, path)
           Dir.chdir(path) do |dir|
             system "7za x \"#{file}\" -y"
@@ -152,17 +163,12 @@ module Six
           end
         end
 
-        private
         def rsync_path
           File.join(@rsync_work_dir, '.rsync')
         end
 
         def read_config
           read_yaml(File.join(rsync_path, 'config.yml'))
-        end
-
-        def read_sums
-          read_yaml(File.join(rsync_path, 'sums.yml'))
         end
 
         def read_yaml(file)
@@ -179,13 +185,13 @@ module Six
           folder = "." unless folder
           file = path unless file
           # Only fetch a specific file
-           puts "Fetching #{path}"
-            arr_opts = []
-            arr_opts << PARAMS
-            arr_opts << File.join(config[:hosts].sample, path)
-            arr_opts << File.join(@rsync_work_dir, folder)
+          puts "Fetching #{path}"
+          arr_opts = []
+          arr_opts << PARAMS
+          arr_opts << File.join(config[:hosts].sample, path)
+          arr_opts << File.join(@rsync_work_dir, folder)
 
-            command('', arr_opts)
+          command('', arr_opts)
         end
 
         def write_default_config
@@ -251,9 +257,13 @@ module Six
           load_sums(file, typ)
         end
 
-        def compare_set(local, remote, typ)
+        def compare_set(local, remote, typ, online = true)
           local[typ] = load_local(typ)
           remote[typ] = load_remote(typ)
+
+
+          #p [local[typ][:md5], remote[typ][:md5]]
+          #gets
 
           if local[typ][:md5] == remote[typ][:md5]
             puts "#{typ} Match!"
@@ -274,7 +284,20 @@ module Six
               when :pack
                 # direct unpack of gz into working folder
                 # Update file
-                mismatch.each { |e| fetch_file(File.join(".pack", e)) }
+                if online
+                  if mismatch.count > (remote[typ][:list].count / 4)
+                    puts "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
+                    arr_opts = []
+                    arr_opts << PARAMS
+                    arr_opts << File.join(config[:hosts].sample, '.pack/.')
+                    arr_opts << File.join(@rsync_work_dir, '.pack')
+
+                    command('', arr_opts)
+
+                  else
+                    mismatch.each { |e| fetch_file(File.join(".pack", e)) }
+                  end
+                end
               when :wd
                 # calculate gz file and unpack
                 mismatch.each { |e| unpack(:path => "#{e}.gz") }
@@ -301,6 +324,7 @@ module Six
 
           ## Pack
           fetch_file(File.join(".pack", ".sums.yml")) if online
+          # TODO: Don't do actions when not online
           compare_set(local, remote, :pack)
           # TODO: Split up the pack and wd sum calcs
           write_sums

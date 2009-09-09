@@ -74,7 +74,12 @@ module Six
         end
 
         def update
+          puts "Updating: #{@working_directory}"
           lib.update('')
+        end
+
+        def reset(opts = {})
+          lib.reset(opts)
         end
 
         # returns a reference to the working directory
