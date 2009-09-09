@@ -308,10 +308,8 @@ module Six
 
             del = []
             local[typ][:list].each_pair do |key, value|
-              if value == remote[typ][:list][key]
-                #puts "Match! #{key}"
-              else
-                puts "Mismatch! #{key}"
+              if remote[typ][:list][key].nil?
+                puts "File does not exist in remote! #{key}"
                 del << key
               end
             end
