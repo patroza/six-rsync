@@ -99,10 +99,12 @@ module Six
             return
           end
 
+          unpack
           write_sums
           # fetch latest sums
-          compare_sums
+          # compare_sums
           # only update whne sums mismatch
+          
           return
 
           arr_opts = []
@@ -112,6 +114,39 @@ module Six
           arr_opts << @rsync_work_dir
 
           command(cmd, arr_opts)
+        end
+
+        def unpack
+          #Dir[File.join(@rsync_work_dir, '**/*')].each do |file|
+          #  relative = file.gsub(/#{@rsync_work_dir}[\\|\/]/, '')
+          #  sum = md5(file)
+          #  sums_wd[relative] = sum if sum
+          #end
+          #File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
+
+          Dir[File.join(@rsync_work_dir, '.pack/**/*')].each do |file|
+            unless File.directory? file
+              relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
+              fil = relative
+              folder = "."
+              if relative[/(.*)\/(.*)/]
+                folder, fil = $1, $2
+              end
+              path = File.join(@rsync_work_dir, folder)
+              FileUtils.mkdir_p path
+              Dir.chdir(path) do |dir|
+                p "7za x \"#{file}\" -y"
+                system "7za x \"#{file}\" -y"
+                if file[/\.tar\.?/]
+                  f2 = fil.gsub('.gz', '')
+                  p f2
+                  system "7za x \"#{f2}\" -y"
+                  FileUtils.rm_f f2
+                end
+              end
+            end
+          end
+
         end
 
         private
@@ -191,8 +226,8 @@ module Six
           else
             pack = []
             puts "Pack NOT match!"
-            local[:pack].each_pair do |key, value|
-              if value == remote[:pack][key]
+            remote[:pack].each_pair do |key, value|
+              if value == local[:pack][key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
@@ -200,9 +235,12 @@ module Six
               end
             end
 
-            pack.each do |e|
-              # TODO: Update file e
-              # TODO: Unpack file e to wd, function pack to wd
+            if pack.size > 0
+              pack.each do |e|
+                # TODO: Update file e
+                # TODO: Unpack file e to wd, function pack to wd
+              end
+              write_sums
             end
           end
 
@@ -227,17 +265,20 @@ module Six
           else
             wd = []
             puts "WD NOT match!"
-            local[:wd].each_pair do |key, value|
-              if value == remote[:wd][key]
+            remote[:wd].each_pair do |key, value|
+              if value == local[:wd][key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
                 wd << key
               end
             end
-            wd.each do |e|
-              # Update file e
-              # Unpack file e to wd, function pack to wd
+            if wd.size > 0
+              wd.each do |e|
+                # Update file e
+                # Unpack file e to wd, function pack to wd
+              end
+              write_sums
             end
           end
 
