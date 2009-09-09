@@ -73,13 +73,13 @@ module Six
             arr_opts = []
             arr_opts << "-I" if opts[:force]
             puts "#{@path} - #{@rsync_work_dir}"
-            #begin
+            begin
               update('', arr_opts)
-            #rescue
+            rescue
               @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
-             # FileUtils.rm_rf @rsync_work_dir
-            #end
+              FileUtils.rm_rf @rsync_work_dir
+            end
       #    rescue
       #      @logger.error "Unable to initialize"
       #    end
