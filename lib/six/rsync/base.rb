@@ -130,7 +130,6 @@ module Six
         def lib
           @lib ||= Rsync::Lib.new(self, @logger)
         end
-    
       end
     end
   end

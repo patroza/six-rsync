@@ -199,35 +199,51 @@ module Six
           # Only fetch a specific file
         end
 
+        def load_sums(file, key)
+          sum = Hash.new
+          File.open(File.join(@rsync_work_dir, file)) do |file|
+            h = Hash.new
+            YAML::load(file).each { |e| h[e[0]] = e[1] }
+            sum[:list] = h
+            sum[:list_md5] = md5(file.path)
+          end
+          sum
+        end
+
+        def load_local(typ)
+          load_sums(".rsync/sums_#{typ}.yml", typ)
+        end
+
+        def load_remote(typ)
+          file = case typ
+          when :pack
+            ".pack/.sums.yml"
+          when :wd
+            ".sums.yml"
+          end
+          load_sums(file, typ)
+        end
+
         # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def compare_sums
           local, remote = Hash.new, Hash.new
 
           # TODO: Update the sums first!
           #
-          File.open(File.join(@rsync_dir, 'sums_pack.yml')) do |file|
-            h = Hash.new
-            YAML::load(file).each { |e| h[e[0]] = e[1] }
-
-            local[:pack] = h
-            local[:pack_md5] = md5(file.path)
-          end
+          local[:pack] = load_local(:pack)
 
           # TODO: First fetch the updated sums list
-          File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml')) do |file|
-            h = Hash.new
-            YAML::load(file).each { |e| h[e[0]] = e[1] }
-            remote[:pack] = h
-            remote[:pack_md5] = md5(file.path)
-          end
+          remote[:pack] = load_remote(:pack)
 
-          if local[:pack_md5] == remote[:pack_md5]
+          rlist, llist = remote[:pack][:list], local[:pack][:list]
+
+          if local[:pack][:md5] == remote[:pack][:md5]
             puts "Pack Match!"
           else
             pack = []
             puts "Pack NOT match!"
-            remote[:pack].each_pair do |key, value|
-              if value == local[:pack][key]
+            rlist.each_pair do |key, value|
+              if value == llist[key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
@@ -243,8 +259,8 @@ module Six
             end
 
             pack_del = []
-            local[:pack].each_pair do |key, value|
-              if value == remote[:pack][key]
+            llist.each_pair do |key, value|
+              if value == rlist[key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
@@ -258,29 +274,19 @@ module Six
           # TODO: Split up the pack and wd sum calcs
           write_sums
 
-          # TODO: Update the sums now first
-          File.open(File.join(@rsync_dir, 'sums_wd.yml')) do |file|
-            h = Hash.new
-            YAML::load(file).each { |e| h[e[0]] = e[1] }
-            local[:wd] = h
-            local[:wd_md5] = md5(file.path)
-          end
+          local[:wd] = load_local(:wd)
 
           # TODO: First fetch the updated sums list
-          File.open(File.join(@rsync_work_dir, '.sums.yml')) do |file|
-            h = Hash.new
-            YAML::load(file).each { |e| h[e[0]] = e[1] }
-            remote[:wd] = h
-            remote[:wd_md5] = md5(file.path)
-          end
+          remote[:wd] = load_remote(:wd)
 
-          if local[:wd_md5] == remote[:wd_md5]
+          if local[:wd][:md5] == remote[:wd][:md5]
             puts "WD Match!"
           else
             wd = []
+            rlist, llist = remote[:wd][:list], local[:wd][:list]
             puts "WD NOT match!"
-            remote[:wd].each_pair do |key, value|
-              if value == local[:wd][key]
+            rlist.each_pair do |key, value|
+              if value == llist[key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
@@ -292,8 +298,8 @@ module Six
             end
 
             wd_del = []
-            local[:wd].each_pair do |key, value|
-              if value == remote[:wd][key]
+            llist.each_pair do |key, value|
+              if value == rlist[key]
                 #puts "Match! #{key}"
               else
                 puts "Mismatch! #{key}"
