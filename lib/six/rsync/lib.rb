@@ -348,7 +348,10 @@ module Six
 
         def md5(file)
           unless File.directory? file
-            Digest::MD5.hexdigest(File.read(file))
+            File.open(file) do |file|
+              file.binmode
+              Digest::MD5.hexdigest(file.read)
+            end
           end
         end
 
