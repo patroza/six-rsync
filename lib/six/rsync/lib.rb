@@ -257,6 +257,8 @@ module Six
           load_sums(file, typ)
         end
 
+        # Something goes wrong when the md5 sums on disk are not up2date with the files on disk
+
         def compare_set(local, remote, typ, online = true)
           local[typ] = load_local(typ)
           remote[typ] = load_remote(typ)
@@ -330,7 +332,7 @@ module Six
           write_sums
 
           ## Working Directory
-          fetch_file(File.join(".sums.yml")) if online
+          fetch_file('.sums.yml') if online
           compare_set(local, remote, :wd)
           write_sums
           # TODO: Verify again?

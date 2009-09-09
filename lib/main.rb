@@ -66,16 +66,16 @@ rs.update
 p rs
 =end
 
-dir = "C:/games/arma2"
-#dir = "C:/packaging/rsync"
+#dir = "C:/games/arma2"
+dir = "C:/packaging/rsync"
 host = "rsync://dev-heaven.net/rel"
 repositories = ["cba", "ace", "acex", "six", "beta"] #, "caa1"]
 repositories.each do |r|
   url = File.join(host, r, '/.')
   #Rsync.clone(url, "@#{r}test", :path => dir, :log => log)
 
-  #rs = Rsync.open(File.join(dir, r), :log => log)
-  rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
+  rs = Rsync.open(File.join(dir, r), :log => log)
+  #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
   rs.update
 end
