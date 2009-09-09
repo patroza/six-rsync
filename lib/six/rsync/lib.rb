@@ -158,56 +158,81 @@ module Six
             sums_pack[rel] = sum if sum
           end
           File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
-          File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') {|file| file.puts sums_pack.sort.to_yaml }
-          File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') {|file| file.puts sums_wd.sort.to_yaml }
         end
 
         def compare_sums
           local, remote = Hash.new, Hash.new
 
+          # TODO: Update the sums first!
+          #
           File.open(File.join(@rsync_dir, 'sums_pack.yml')) do |file|
-            local[:pack] = YAML::load(file)
+            h = Hash.new
+            YAML::load(file).each { |e| h[e[0]] = e[1] }
+
+            local[:pack] = h
             local[:pack_md5] = md5(file.path)
           end
 
-          File.open(File.join(@rsync_dir, 'sums_wd.yml')) do |file|
-            local[:wd] = YAML::load(file)
-            local[:wd_md5] = md5(file.path)
-          end
-
+          # TODO: First fetch the updated sums list
           File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml')) do |file|
-            remote[:pack] = YAML::load(file)
+            h = Hash.new
+            YAML::load(file).each { |e| h[e[0]] = e[1] }
+            remote[:pack] = h
             remote[:pack_md5] = md5(file.path)
           end
 
+          if local[:pack_md5] == remote[:pack_md5]
+            puts "Pack Match!"
+          else
+            pack = []
+            puts "Pack NOT match!"
+            local[:pack].each_pair do |key, value|
+              if value == remote[:pack][key]
+                #puts "Match! #{key}"
+              else
+                puts "Mismatch! #{key}"
+                pack << key
+              end
+            end
+
+            pack.each do |e|
+              # TODO: Update file e
+              # TODO: Unpack file e to wd, function pack to wd
+            end
+          end
+
+          # TODO: Update the sums now first
+          File.open(File.join(@rsync_dir, 'sums_wd.yml')) do |file|
+            h = Hash.new
+            YAML::load(file).each { |e| h[e[0]] = e[1] }
+            local[:wd] = h
+            local[:wd_md5] = md5(file.path)
+          end
+
+          # TODO: First fetch the updated sums list
           File.open(File.join(@rsync_work_dir, '.sums.yml')) do |file|
-            remote[:wd] = YAML::load(file)
+            h = Hash.new
+            YAML::load(file).each { |e| h[e[0]] = e[1] }
+            remote[:wd] = h
             remote[:wd_md5] = md5(file.path)
           end
 
           if local[:wd_md5] == remote[:wd_md5]
             puts "WD Match!"
           else
+            wd = []
             puts "WD NOT match!"
             local[:wd].each_pair do |key, value|
               if value == remote[:wd][key]
-                puts "Match!"
+                #puts "Match! #{key}"
               else
-                puts "Mismatch!"
+                puts "Mismatch! #{key}"
+                wd << key
               end
             end
-          end
-
-          if local[:pack_md5] == remote[:pack_md5]
-            puts "Pack Match!"
-          else
-            puts "Pack NOT match!"
-            local[:pack].each_pair do |key, value|
-              if value == remote[:pack][key]
-                puts "Match!"
-              else
-                puts "Mismatch!"
-              end
+            pack.each do |e|
+              # Update file e
+              # Unpack file e to wd, function pack to wd
             end
           end
 
