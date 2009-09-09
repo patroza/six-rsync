@@ -4,6 +4,8 @@ module Six
       class RsyncExecuteError < StandardError
       end
 
+      # TODO: Check ruby md5 vs md5sum.exe cpu and mem?
+
       class Lib
         PROTECTED = false
         tmp = Hash.new
@@ -314,7 +316,7 @@ module Six
                 del << key
               end
             end
-            puts "To delete #{del}"
+            puts "To delete: #{del.join(',')}" if del.size > 0
             del.each { |e| del_file(e, typ) }
           end
         end
