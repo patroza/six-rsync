@@ -44,6 +44,7 @@ module Six
             #return
           end
           FileUtils.mkdir_p rsync_path
+          FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack')
           write_config(config)
         end
 
@@ -65,23 +66,23 @@ module Six
             config[:hosts] << repository
           end
 
-          begin
+     #     begin
             init
 
             # TODO: Eval move to update?
             arr_opts = []
             arr_opts << "-I" if opts[:force]
-
-            begin
+            puts "#{@path} - #{@rsync_work_dir}"
+            #begin
               update('', arr_opts)
-            rescue
+            #rescue
               @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
-              FileUtils.rm_rf @rsync_work_dir
-            end
-          rescue
-            @logger.error "Unable to initialize"
-          end
+             # FileUtils.rm_rf @rsync_work_dir
+            #end
+      #    rescue
+      #      @logger.error "Unable to initialize"
+      #    end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
@@ -224,11 +225,11 @@ module Six
           pack = /\A.pack[\\|\/]/
 
           h = calc_sums(:wd)
-          File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          File.open(File.join(@rsync_work_dir, '.rsync', 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
           #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
 
           h = calc_sums(:pack)
-          File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          File.open(File.join(@rsync_work_dir, '.rsync', 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
           #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
         end
 
@@ -372,6 +373,7 @@ module Six
             drive = rsync_cmd[WINDRIVE]
             rsync_cmd.gsub!(drive, " /cygdrive/#{$1}")
           end
+          p rsync_cmd
 
           out = nil
           if chdir && (Dir.getwd != path)
@@ -380,6 +382,7 @@ module Six
             out = run_command(rsync_cmd, &block)
           end
 
+          p out
           if @logger
             @logger.info(rsync_cmd)
             @logger.debug(out)
