@@ -160,6 +160,11 @@ module Six
           File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
         end
 
+        def fetch_file(file)
+          # Only fetch a specific file
+        end
+
+        # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def compare_sums
           local, remote = Hash.new, Hash.new
 
@@ -230,11 +235,13 @@ module Six
                 wd << key
               end
             end
-            pack.each do |e|
+            wd.each do |e|
               # Update file e
               # Unpack file e to wd, function pack to wd
             end
           end
+
+          # TODO: Update the sum files again if updated :D
 
         end
 
