@@ -74,6 +74,7 @@ module Six
 
             begin
               update('', arr_opts)
+              write_sums
             rescue
               @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
@@ -98,7 +99,6 @@ module Six
             return
           end
 
-          #unpack
           write_sums
           # fetch latest sums
           compare_sums
@@ -109,8 +109,10 @@ module Six
           arr_opts = []
           arr_opts << PARAMS
           arr_opts += x_opts
-          arr_opts << config[:hosts].sample
-          arr_opts << @rsync_work_dir
+
+          # TODO: UNCLUSTERFUCK
+          arr_opts << File.join(config[:hosts].sample, '.pack/.')
+          arr_opts << File.join(@rsync_work_dir, '.pack')
 
           command(cmd, arr_opts)
         end
@@ -119,6 +121,9 @@ module Six
           Dir.chdir(path) do |dir|
             system "7za x \"#{file}\" -y"
             if file[/\.tar\.?/]
+              file[/(.*)\/(.*)/]
+              fil = $2
+              fil = file unless fil
               f2 = fil.gsub('.gz', '')
               system "7za x \"#{f2}\" -y"
               FileUtils.rm_f f2
@@ -128,7 +133,7 @@ module Six
 
         def unpack(opts = {})
           items = if opts[:path]
-            File.join(@rsync_work_dir, '.pack', opts[:path])
+            [File.join(@rsync_work_dir, '.pack', opts[:path])]
           else
             Dir[File.join(@rsync_work_dir, '.pack/**/*')]
           end
@@ -168,35 +173,57 @@ module Six
           end          
         end
 
+        def fetch_file(path)
+          path[/(.*)\/(.*)/]
+          folder, file = $1, $2
+          folder = "." unless folder
+          file = path unless file
+          # Only fetch a specific file
+           puts "Fetching #{path}"
+            arr_opts = []
+            arr_opts << PARAMS
+            arr_opts << File.join(config[:hosts].sample, path)
+            arr_opts << File.join(@rsync_work_dir, folder)
+
+            command('', arr_opts)
+        end
+
         def write_default_config
           FileUtils.mkdir_p rsync_path
           write_config(config)
+        end
+
+        def calc_sums(typ)
+          ar = []
+          reg = case typ
+          when :pack
+            ar = Dir[File.join(@rsync_work_dir, '/.pack/**/*')]
+            /#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/
+          when :wd
+            ar = Dir[File.join(@rsync_work_dir, '/**/*')]
+            /#{@rsync_work_dir}[\\|\/]/
+          end
+          h = Hash.new
+          ar.each do |file|
+            relative = file.gsub(reg, '')
+            sum = md5(file)
+            h[relative] = sum if sum
+          end
+          h
         end
 
         def write_sums
           sums_pack = Hash.new
           sums_wd = Hash.new
           pack = /\A.pack[\\|\/]/
-          Dir[File.join(@rsync_work_dir, '**/*')].each do |file|
-            relative = file.gsub(/#{@rsync_work_dir}[\\|\/]/, '')
-            sum = md5(file)
-            sums_wd[relative] = sum if sum
-          end
-          File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
 
-          Dir[File.join(@rsync_work_dir, '.pack/**/*')].each do |file|
-            relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
-            rel = relative.gsub(pack, '')
-            sum = md5(file)
-            sums_pack[rel] = sum if sum
-          end
-          File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
-          #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
-          #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
-        end
+          h = calc_sums(:wd)
+          File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
 
-        def fetch_file(file)
-          # Only fetch a specific file
+          h = calc_sums(:pack)
+          File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
         end
 
         def load_sums(file, key)
@@ -205,7 +232,7 @@ module Six
             h = Hash.new
             YAML::load(file).each { |e| h[e[0]] = e[1] }
             sum[:list] = h
-            sum[:list_md5] = md5(file.path)
+            sum[:md5] = md5(file.path)
           end
           sum
         end
@@ -224,102 +251,75 @@ module Six
           load_sums(file, typ)
         end
 
+        def compare_set(local, remote, typ)
+          local[typ] = load_local(typ)
+          remote[typ] = load_remote(typ)
+
+          if local[typ][:md5] == remote[typ][:md5]
+            puts "#{typ} Match!"
+          else
+            mismatch = []
+            puts "#{typ} NOT match!"
+            remote[typ][:list].each_pair do |key, value|
+              if value == local[typ][:list][key]
+                #puts "Match! #{key}"
+              else
+                puts "Mismatch! #{key}"
+                mismatch << key
+              end
+            end
+
+            if mismatch.size > 0
+              case typ
+              when :pack
+                # direct unpack of gz into working folder
+                # Update file
+                mismatch.each { |e| fetch_file(File.join(".pack", e)) }
+              when :wd
+                # calculate gz file and unpack
+                mismatch.each { |e| unpack(:path => "#{e}.gz") }
+              end
+            end
+
+            del = []
+            local[typ][:list].each_pair do |key, value|
+              if value == remote[typ][:list][key]
+                #puts "Match! #{key}"
+              else
+                puts "Mismatch! #{key}"
+                del << key
+              end
+            end
+            puts "To delete #{del}"
+            del.each { |e| del_file(e, typ) }
+          end
+        end
+
         # TODO: Allow local-self healing, AND remote healing. reset and fetch?
-        def compare_sums
+        def compare_sums(online = true)
           local, remote = Hash.new, Hash.new
 
-          # TODO: Update the sums first!
-          #
-          local[:pack] = load_local(:pack)
-
-          # TODO: First fetch the updated sums list
-          remote[:pack] = load_remote(:pack)
-
-          rlist, llist = remote[:pack][:list], local[:pack][:list]
-
-          if local[:pack][:md5] == remote[:pack][:md5]
-            puts "Pack Match!"
-          else
-            pack = []
-            puts "Pack NOT match!"
-            rlist.each_pair do |key, value|
-              if value == llist[key]
-                #puts "Match! #{key}"
-              else
-                puts "Mismatch! #{key}"
-                pack << key
-              end
-            end
-
-            if pack.size > 0
-              pack.each do |e|
-                # TODO: Update file e
-                # TODO: Unpack file e to wd, function pack to wd
-              end
-            end
-
-            pack_del = []
-            llist.each_pair do |key, value|
-              if value == rlist[key]
-                #puts "Match! #{key}"
-              else
-                puts "Mismatch! #{key}"
-                pack_del << key
-              end
-            end
-            puts "To delete #{wd_del}"
-            pack_del.each { |e| del_pack_file(e) }
-          end
-
+          ## Pack
+          fetch_file(File.join(".pack", ".sums.yml")) if online
+          compare_set(local, remote, :pack)
           # TODO: Split up the pack and wd sum calcs
           write_sums
 
-          local[:wd] = load_local(:wd)
-
-          # TODO: First fetch the updated sums list
-          remote[:wd] = load_remote(:wd)
-
-          if local[:wd][:md5] == remote[:wd][:md5]
-            puts "WD Match!"
-          else
-            wd = []
-            rlist, llist = remote[:wd][:list], local[:wd][:list]
-            puts "WD NOT match!"
-            rlist.each_pair do |key, value|
-              if value == llist[key]
-                #puts "Match! #{key}"
-              else
-                puts "Mismatch! #{key}"
-                wd << key
-              end
-            end
-            if wd.size > 0
-              wd.each { |e| unpack(:path => "#{e}.gz") }
-            end
-
-            wd_del = []
-            llist.each_pair do |key, value|
-              if value == rlist[key]
-                #puts "Match! #{key}"
-              else
-                puts "Mismatch! #{key}"
-                wd_del << key
-              end
-            end
-            puts "To delete #{wd_del}"
-            wd_del.each { |e| del_wd_file(e) }
-          end
+          ## Working Directory
+          fetch_file(File.join(".sums.yml")) if online
+          compare_set(local, remote, :wd)
           write_sums
           # TODO: Verify again?
-
         end
 
-        def del_wd_file(file, opts = {})
+        def del_file(file, typ, opts = {})
+          file = case typ
+          when :pack
+            File.join('.pack', file)
+          when :wd
+            file
+          end
           FileUtils.rm_f File.join(@rsync_work_dir, file)
-        end
-
-        def del_pack_file(file, opts = {})
-          FileUtils.rm_f File.join(@rsync_work_dir, '.pack', file)
         end
 
         def md5(file)
