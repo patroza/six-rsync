@@ -99,6 +99,12 @@ module Six
             return
           end
 
+          write_sums
+          # fetch latest sums
+          compare_sums
+          # only update whne sums mismatch
+          return
+
           arr_opts = []
           arr_opts << PARAMS
           arr_opts += x_opts
@@ -135,21 +141,86 @@ module Six
         end
 
         def write_sums
-          sums = Hash.new
+          sums_pack = Hash.new
+          sums_wd = Hash.new
+          pack = /\A.pack[\\|\/]/
           Dir[File.join(@rsync_work_dir, '**/*')].each do |file|
             relative = file.gsub(/#{@rsync_work_dir}[\\|\/]/, '')
-            sums[relative] = Digest::MD5.hexdigest(File.read(file))
+            sum = md5(file)
+            sums_wd[relative] = sum if sum
+          end
+          File.open(File.join(@rsync_dir, 'sums_wd.yml'), 'w') { |file| file.puts sums_wd.sort.to_yaml }
+
+          Dir[File.join(@rsync_work_dir, '.pack/**/*')].each do |file|
+            relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
+            rel = relative.gsub(pack, '')
+            sum = md5(file)
+            sums_pack[rel] = sum if sum
+          end
+          File.open(File.join(@rsync_dir, 'sums_pack.yml'), 'w') { |file| file.puts sums_pack.sort.to_yaml }
+          File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') {|file| file.puts sums_pack.sort.to_yaml }
+          File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') {|file| file.puts sums_wd.sort.to_yaml }
+        end
+
+        def compare_sums
+          local, remote = Hash.new, Hash.new
+
+          File.open(File.join(@rsync_dir, 'sums_pack.yml')) do |file|
+            local[:pack] = YAML::load(file)
+            local[:pack_md5] = md5(file.path)
           end
 
-          File.open(File.join(rsync_path, 'sums.yml'), 'w') do |file|
-            file.puts sums.to_yaml
+          File.open(File.join(@rsync_dir, 'sums_wd.yml')) do |file|
+            local[:wd] = YAML::load(file)
+            local[:wd_md5] = md5(file.path)
+          end
+
+          File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml')) do |file|
+            remote[:pack] = YAML::load(file)
+            remote[:pack_md5] = md5(file.path)
+          end
+
+          File.open(File.join(@rsync_work_dir, '.sums.yml')) do |file|
+            remote[:wd] = YAML::load(file)
+            remote[:wd_md5] = md5(file.path)
+          end
+
+          if local[:wd_md5] == remote[:wd_md5]
+            puts "WD Match!"
+          else
+            puts "WD NOT match!"
+            local[:wd].each_pair do |key, value|
+              if value == remote[:wd][key]
+                puts "Match!"
+              else
+                puts "Mismatch!"
+              end
+            end
+          end
+
+          if local[:pack_md5] == remote[:pack_md5]
+            puts "Pack Match!"
+          else
+            puts "Pack NOT match!"
+            local[:pack].each_pair do |key, value|
+              if value == remote[:pack][key]
+                puts "Match!"
+              else
+                puts "Mismatch!"
+              end
+            end
+          end
+
+        end
+
+        def md5(file)
+          unless File.directory? file
+            Digest::MD5.hexdigest(File.read(file))
           end
         end
 
         def write_config(config = YAML::load(DEFAULT))
-          File.open(File.join(rsync_path, 'config.yml'), 'w') do |file|
-            file.puts config.to_yaml
-          end
+          File.open(File.join(rsync_path, 'config.yml'), 'w') { |file| file.puts config.to_yaml }
         end
 
         def command_lines(cmd, opts = [], chdir = true, redirect = '')

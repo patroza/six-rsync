@@ -1,5 +1,6 @@
 =begin
   7za.exe can be used to unpack the gzips!
+  TODO: Move all tool downloads and fetches (even server gits?) to rsync ;-)
 
 2 methods:
   a) Put the modfolder into a .7z, distribute this .7z together with the updater. The updater will unpack it, and then rsync future updates, with uncompressed files.
@@ -65,14 +66,14 @@ rs.update
 p rs
 =end
 
-dir = "C:/temp/rsync"
+dir = "C:/games/arma2"
 host = "rsync://dev-heaven.net/rel"
-repositories = ["cba", "ace", "acex", "six", "beta", "caa1"]
+repositories = ["cba", "ace", "acex", "six", "beta"] #, "caa1"]
 repositories.each do |r|
   url = File.join(host, r, '/.')
-  Rsync.clone(url, r, :path => dir, :log => log)
+  #Rsync.clone(url, "@#{r}test", :path => dir, :log => log)
 
-  rs = Rsync.open(File.join(dir, r), :log => log)
+  rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   rs.update
   p rs
 end
