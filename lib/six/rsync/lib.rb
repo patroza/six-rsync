@@ -34,7 +34,7 @@ module Six
         end
 
         def init
-          puts "Processing: #{rsync_path}"
+          @logger.info "Processing: #{rsync_path}"
           if FileTest.exist? rsync_path
             @logger.error "Seems to already be an Rsync repository, Aborting!"
             raise RsyncExecuteError
@@ -46,6 +46,7 @@ module Six
             #return
           end
           FileUtils.mkdir_p rsync_path
+          # TODO: .pack path should be formulized
           FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack')
           write_config(config)
         end
@@ -74,7 +75,6 @@ module Six
             # TODO: Eval move to update?
             arr_opts = []
             arr_opts << "-I" if opts[:force]
-            puts "#{@path} - #{@rsync_work_dir}"
             begin
               update('', arr_opts)
             rescue
@@ -90,6 +90,7 @@ module Six
         end
 
         def update(cmd, x_opts = [], opts = {})
+          @logger.info "Updating: #{@rsync_work_dir}"
           @config = read_config
           unless @config
             @logger.error "Not an Rsync repository!"
@@ -103,13 +104,16 @@ module Six
 
           #unpack
 
+          host = config[:hosts].sample
+          @logger.info "Trying: #{host}, please wait..."
+
           if opts[:force]
             arr_opts = []
             arr_opts << PARAMS
             arr_opts += x_opts
 
             # TODO: UNCLUSTERFUCK
-            arr_opts << File.join(config[:hosts].sample, '.pack/.')
+            arr_opts << File.join(host, '.pack/.')
             arr_opts << File.join(@rsync_work_dir, '.pack')
 
             command(cmd, arr_opts)
@@ -124,7 +128,7 @@ module Six
         end
 
         def reset(opts = {})
-          puts "Restting!"
+          @logger.info "Restting!"
           if opts[:hard]
             compare_sums(false)
           end
@@ -188,10 +192,12 @@ module Six
           folder = "." unless folder
           file = path unless file
           # Only fetch a specific file
-          puts "Fetching #{path}"
+          host = "#{config[:hosts].sample}"
+          # TODO: Retry. And maybe fetch from same host! @host global var?
+          @logger.info "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
-          arr_opts << File.join(config[:hosts].sample, path)
+          arr_opts << File.join(host, path)
           arr_opts << File.join(@rsync_work_dir, folder)
 
           command('', arr_opts)
@@ -266,20 +272,16 @@ module Six
           local[typ] = load_local(typ)
           remote[typ] = load_remote(typ)
 
-
-          #p [local[typ][:md5], remote[typ][:md5]]
-          #gets
-
           if local[typ][:md5] == remote[typ][:md5]
-            puts "#{typ} Match!"
+            @logger.info "#{typ} Match!"
           else
             mismatch = []
-            puts "#{typ} NOT match!"
+            @logger.info "#{typ} NOT match!"
             remote[typ][:list].each_pair do |key, value|
               if value == local[typ][:list][key]
-                #puts "Match! #{key}"
+                #@logger.info "Match! #{key}"
               else
-                puts "Mismatch! #{key}"
+                @logger.info "Mismatch! #{key}"
                 mismatch << key
               end
             end
@@ -291,7 +293,7 @@ module Six
                 # Update file
                 if online
                   if mismatch.count > (remote[typ][:list].count / 4)
-                    puts "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
+                    @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                     arr_opts = []
                     arr_opts << PARAMS
                     arr_opts << File.join(config[:hosts].sample, '.pack/.')
@@ -312,11 +314,11 @@ module Six
             del = []
             local[typ][:list].each_pair do |key, value|
               if remote[typ][:list][key].nil?
-                puts "File does not exist in remote! #{key}"
+                @logger.info "File does not exist in remote! #{key}"
                 del << key
               end
             end
-            puts "To delete: #{del.join(',')}" if del.size > 0
+            @logger.info "To delete: #{del.join(',')}" if del.size > 0
             del.each { |e| del_file(e, typ) }
             write_sums
           end
@@ -378,7 +380,6 @@ module Six
             drive = rsync_cmd[WINDRIVE]
             rsync_cmd.gsub!(drive, " /cygdrive/#{$1}")
           end
-          p rsync_cmd
 
           out = nil
           if chdir && (Dir.getwd != path)
@@ -387,9 +388,8 @@ module Six
             out = run_command(rsync_cmd, &block)
           end
 
-          p out
           if @logger
-            @logger.info(rsync_cmd)
+            @logger.debug(rsync_cmd)
             @logger.debug(out)
           end
 
