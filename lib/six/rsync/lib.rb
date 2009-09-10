@@ -186,14 +186,12 @@ module Six
           end          
         end
 
-        def fetch_file(path)
+        def fetch_file(path, host)
           path[/(.*)\/(.*)/]
           folder, file = $1, $2
           folder = "." unless folder
           file = path unless file
           # Only fetch a specific file
-          host = "#{config[:hosts].sample}"
-          # TODO: Retry. And maybe fetch from same host! @host global var?
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
@@ -268,7 +266,7 @@ module Six
 
         # Something goes wrong when the md5 sums on disk are not up2date with the files on disk
 
-        def compare_set(local, remote, typ, online = true)
+        def compare_set(local, remote, typ, host, online = true)
           local[typ] = load_local(typ)
           remote[typ] = load_remote(typ)
 
@@ -296,13 +294,13 @@ module Six
                     @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                     arr_opts = []
                     arr_opts << PARAMS
-                    arr_opts << File.join(config[:hosts].sample, '.pack/.')
+                    arr_opts << File.join(host, '.pack/.')
                     arr_opts << File.join(@rsync_work_dir, '.pack')
 
                     command('', arr_opts)
 
                   else
-                    mismatch.each { |e| fetch_file(File.join(".pack", e)) }
+                    mismatch.each { |e| fetch_file(File.join(".pack", e), host) }
                   end
                 end
               when :wd
@@ -327,15 +325,16 @@ module Six
         # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def compare_sums(online = true)
           local, remote = Hash.new, Hash.new
+          host = config[:hosts].sample
 
           ## Pack
-          fetch_file(File.join(".pack", ".sums.yml")) if online
+          fetch_file(File.join(".pack", ".sums.yml"), host) if online
           # TODO: Don't do actions when not online
-          compare_set(local, remote, :pack)
+          compare_set(local, remote, :pack, host)
 
           ## Working Directory
-          fetch_file('.sums.yml') if online
-          compare_set(local, remote, :wd)
+          fetch_file('.sums.yml', host) if online
+          compare_set(local, remote, :wd, host)
         end
 
         def del_file(file, typ, opts = {})
