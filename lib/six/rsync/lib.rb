@@ -90,7 +90,7 @@ module Six
         end
 
         def update(cmd, x_opts = [], opts = {})
-          @logger.info "Updating: #{@rsync_work_dir}"
+          @logger.info "Updating: #{@rsync_work_dir}, please wait..."
           @config = read_config
           unless @config
             @logger.error "Not an Rsync repository!"
@@ -194,7 +194,7 @@ module Six
           # Only fetch a specific file
           host = "#{config[:hosts].sample}"
           # TODO: Retry. And maybe fetch from same host! @host global var?
-          @logger.info "Fetching #{path} from  #{host}"
+          @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
           arr_opts << File.join(host, path)
