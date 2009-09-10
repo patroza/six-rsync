@@ -22,6 +22,7 @@ module Six
           @rsync_dir = nil
           @rsync_work_dir = nil
           @path = nil
+          @version = nil
 
           if base.is_a?(Rsync::Base)
             @rsync_dir = base.repo.path
@@ -117,10 +118,12 @@ module Six
             arr_opts << File.join(@rsync_work_dir, '.pack')
 
             command(cmd, arr_opts)
-            write_sums
+            write_sums(:pack)
+            write_sums(:wd)
           else
             #reset(:hard => true)
-            write_sums
+            write_sums(:pack)
+            write_sums(:wd)
 
             # fetch latest sums and only update when changed
             compare_sums
@@ -225,18 +228,17 @@ module Six
           h
         end
 
-        def write_sums
-          sums_pack = Hash.new
-          sums_wd = Hash.new
-          pack = /\A.pack[\\|\/]/
-
-          h = calc_sums(:wd)
-          File.open(File.join(@rsync_work_dir, '.rsync', 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-          #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-
-          h = calc_sums(:pack)
-          File.open(File.join(@rsync_work_dir, '.rsync', 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-          #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+        def write_sums(typ)
+          h = calc_sums(typ)
+          case typ
+          when :pack
+            File.open(File.join(@rsync_work_dir, '.rsync', 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+            #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          when :wd
+            File.open(File.join(@rsync_work_dir, '.rsync', 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+            #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          end
+          h
         end
 
         def load_sums(file, key)
@@ -263,8 +265,6 @@ module Six
           end
           load_sums(file, typ)
         end
-
-        # Something goes wrong when the md5 sums on disk are not up2date with the files on disk
 
         def compare_set(local, remote, typ, host, online = true)
           local[typ] = load_local(typ)
@@ -318,7 +318,7 @@ module Six
             end
             @logger.info "To delete: #{del.join(',')}" if del.size > 0
             del.each { |e| del_file(e, typ) }
-            write_sums
+            write_sums(typ)
           end
         end
 
@@ -328,13 +328,35 @@ module Six
           host = config[:hosts].sample
 
           ## Pack
-          fetch_file(File.join(".pack", ".sums.yml"), host) if online
+          if online
+            verfile = File.join(".pack", ".version")
+            fetch_file(verfile, host)
+            ver = nil
+            if FileTest.exist?(File.join(@rsync_work_dir, verfile))
+              File.open(File.join(@rsync_work_dir, verfile)) {|file| ver = file.read.to_i }
+            end
+
+            verfile = File.join(@rsync_work_dir, '.rsync', '.version')
+            if FileTest.exist?(verfile)
+              File.open(verfile) {|file| @version = file.read.to_i }
+            end
+            @version = 0 unless @version
+            if @version > ver # && !force
+              @logger.warn "WARNING, version on server is OLDER, aborting!"
+              raise RsyncExecuteError
+            end
+            fetch_file(File.join(".pack", ".sums.yml"), host)
+          end
           # TODO: Don't do actions when not online
           compare_set(local, remote, :pack, host)
 
           ## Working Directory
           fetch_file('.sums.yml', host) if online
           compare_set(local, remote, :wd, host)
+        end
+
+        def write_version
+          File.open(File.join(@rsync_work_dir, '.rsync/.version'), 'w') {|file| file.puts @version }
         end
 
         def del_file(file, typ, opts = {})
