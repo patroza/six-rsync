@@ -16,7 +16,11 @@ module Six
         else
           "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
         end
-        WINDRIVE = / (\w)\:/
+        WINDRIVE = /\"(\w)\:/
+
+        def esc(val)
+          "\"#{val}\""
+        end
 
         def initialize(base = nil, logger = nil)
           @rsync_dir = nil
@@ -114,8 +118,8 @@ module Six
             arr_opts += x_opts
 
             # TODO: UNCLUSTERFUCK
-            arr_opts << File.join(host, '.pack/.')
-            arr_opts << File.join(@rsync_work_dir, '.pack')
+            arr_opts << esc(File.join(host, '.pack/.'))
+            arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
 
             command(cmd, arr_opts)
             write_sums(:pack)
@@ -131,7 +135,7 @@ module Six
         end
 
         def reset(opts = {})
-          @logger.info "Restting!"
+          @logger.info "Resetting!"
           if opts[:hard]
             compare_sums(false)
           end
@@ -198,8 +202,8 @@ module Six
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
-          arr_opts << File.join(host, path)
-          arr_opts << File.join(@rsync_work_dir, folder)
+          arr_opts << esc(File.join(host, path))
+          arr_opts << esc(File.join(@rsync_work_dir, folder))
 
           command('', arr_opts)
         end
@@ -290,22 +294,36 @@ module Six
                 # direct unpack of gz into working folder
                 # Update file
                 if online
+                  # TODO: Progress bar
                   if mismatch.count > (remote[typ][:list].count / 4)
                     @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                     arr_opts = []
                     arr_opts << PARAMS
                     arr_opts << File.join(host, '.pack/.')
-                    arr_opts << File.join(@rsync_work_dir, '.pack')
+                    arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
 
                     command('', arr_opts)
 
                   else
-                    mismatch.each { |e| fetch_file(File.join(".pack", e), host) }
+                    c = mismatch.size
+                    i = 0
+                    mismatch.each do |e|
+                      # TODO: Nicer progress bar...
+                      i += 1
+                      @logger.info "Processing file #{i}/#{c}: #{e}"
+                      fetch_file(File.join(".pack", e), host)
+                    end
                   end
                 end
               when :wd
-                # calculate gz file and unpack
-                mismatch.each { |e| unpack(:path => "#{e}.gz") }
+                c = mismatch.size
+                i = 0
+                mismatch.each do |e|
+                  # TODO: Nicer progress bar...
+                  i += 1
+                  @logger.info "Unpacking #{i}/#{c}: #{e}"
+                  unpack(:path => "#{e}.gz")
+                end
               end
             end
 
@@ -399,7 +417,7 @@ module Six
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
-            rsync_cmd.gsub!(drive, " /cygdrive/#{$1}")
+            rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
           end
 
           out = nil
