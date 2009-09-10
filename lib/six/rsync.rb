@@ -27,6 +27,7 @@ module Six
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
       ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH}"
+      ENV['CYGWIN'] = "nontsec"
 
       # open a bare repository
       #

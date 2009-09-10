@@ -318,6 +318,7 @@ module Six
             end
             puts "To delete: #{del.join(',')}" if del.size > 0
             del.each { |e| del_file(e, typ) }
+            write_sums
           end
         end
 
@@ -329,14 +330,10 @@ module Six
           fetch_file(File.join(".pack", ".sums.yml")) if online
           # TODO: Don't do actions when not online
           compare_set(local, remote, :pack)
-          # TODO: Split up the pack and wd sum calcs
-          write_sums
 
           ## Working Directory
           fetch_file('.sums.yml') if online
           compare_set(local, remote, :wd)
-          write_sums
-          # TODO: Verify again?
         end
 
         def del_file(file, typ, opts = {})
@@ -349,12 +346,18 @@ module Six
           FileUtils.rm_f File.join(@rsync_work_dir, file)
         end
 
-        def md5(file)
-          unless File.directory? file
-            File.open(file) do |file|
-              file.binmode
-              Digest::MD5.hexdigest(file.read)
+        def md5(path)
+          unless File.directory? path
+            path[/(.*)[\/|\\](.*)/]
+            folder, file = $1, $2
+            Dir.chdir(folder) do
+              r = %x[md5sum "#{file}"]
+              r[/\A\w*/]
             end
+            #File.open(file) do |file|
+            #  file.binmode
+            #  Digest::MD5.hexdigest(file.read)
+            #end
           end
         end
 
