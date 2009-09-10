@@ -310,7 +310,7 @@ module Six
                     mismatch.each do |e|
                       # TODO: Nicer progress bar...
                       i += 1
-                      @logger.info "Processing file #{i}/#{c}: #{e}"
+                      @logger.info "Fetching #{i}/#{c}: #{e}"
                       fetch_file(File.join(".pack", e), host)
                     end
                   end
