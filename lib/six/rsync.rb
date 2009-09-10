@@ -10,8 +10,7 @@ require 'six/rsync/base'
 if RUBY_VERSION == "1.8.7"
   class Array
     def sample
-      idx = rand(self.size - 1)
-      self[idx]
+      self[rand self.size]
     end
   end
 end

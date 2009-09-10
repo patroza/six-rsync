@@ -69,7 +69,7 @@ module Six
             config[:hosts] << repository
           end
 
-     #     begin
+          begin
             init
 
             # TODO: Eval move to update?
@@ -82,9 +82,9 @@ module Six
               # Dangerous? :D
               FileUtils.rm_rf @rsync_work_dir
             end
-      #    rescue
-      #      @logger.error "Unable to initialize"
-      #    end
+          rescue
+            @logger.error "Unable to initialize"
+          end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end

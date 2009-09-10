@@ -69,10 +69,15 @@ p rs
 #dir = "C:/games/arma2"
 dir = "C:/packaging/rsync"
 host = "rsync://dev-heaven.net/rel"
+hosts = ["rsync://dev-heaven.net/rel", "rsync://s01.6thsense.eu/rel", "rsync://s02.6thsense.eu/rel"]
 repositories = ["cba", "ace", "acex", "six", "beta", "caa1"]
 repositories.each do |r|
-  url = File.join(host, r, '/.')
-  #Rsync.clone(url, "@#{r}test", :path => dir, :log => log)
+  urls = []
+  hosts.each do |host|
+    urls << File.join(host, r, '/.')
+  end
+
+  Rsync.clone(urls, r, :path => dir, :log => log)
 
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
