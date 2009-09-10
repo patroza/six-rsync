@@ -30,7 +30,7 @@ module Six
 
       # open a bare repository
       #
-      # this takes the path to a bare git repo
+      # this takes the path to a bare rsync repo
       # it expects not to be able to use a working directory
       # so you can't checkout stuff, commit things, etc.
       # but you can do most read operations
@@ -38,12 +38,12 @@ module Six
         Base.bare(rsync_dir, options)
       end
 
-      # open an existing git working directory
+      # open an existing rsync working directory
       #
       # this will most likely be the most common way to create
-      # a git reference, referring to a working directory.
+      # a rsync reference, referring to a working directory.
       # if not provided in the options, the library will assume
-      # your rsync_dir and index are in the default place (.git/, .git/index)
+      # your rsync_dir is in the default place (.rsync/)
       #
       # options
       #   :repository => '/path/to/alt_rsync_dir'
@@ -52,7 +52,7 @@ module Six
         Base.open(working_dir, options)
       end
 
-      # initialize a new git repository, defaults to the current working directory
+      # initialize a new rsync repository, defaults to the current working directory
       #
       # options
       #   :repository => '/path/to/alt_rsync_dir'
@@ -69,24 +69,24 @@ module Six
       #   :index => '/path/to/alt_index_file'
       #
       # example
-      #  Rsync.clone('git://repo.or.cz/rubygit.git', 'clone.git', :bare => true)
+      #  Rsync.clone('rsync://repo.or.cz/ruby', 'clone', :bare => true)
       #
       def self.clone(repository, name, options = {})
         Base.clone(repository, name, options)
       end
 
       # Export the current HEAD (or a branch, if <tt>options[:branch]</tt>
-      # is specified) into the +name+ directory, then remove all traces of git from the
+      # is specified) into the +name+ directory, then remove all traces of rsync from the
       # directory.
       #
       # See +clone+ for options.  Does not obey the <tt>:remote</tt> option,
-      # since the .git info will be deleted anyway; always uses the default
+      # since the rsync info will be deleted anyway; always uses the default
       # remote, 'origin.'
       def self.export(repository, name, options = {})
         options.delete(:remote)
         repo = clone(repository, name, {:depth => 1}.merge(options))
         repo.checkout("origin/#{options[:branch]}") if options[:branch]
-        Dir.chdir(repo.dir.to_s) { FileUtils.rm_r '.git' }
+        Dir.chdir(repo.dir.to_s) { FileUtils.rm_r '.rsync' }
       end
 
       #g.config('user.name', 'Scott Chacon') # sets value

@@ -1,10 +1,10 @@
+# TODO: Add Rsync add, commit and push (Update should be pull?), either with staging like area like Git, or add is pack into .pack, and commit is update sum ?
+
 module Six
   module Repositories
     module Rsync
       class RsyncExecuteError < StandardError
       end
-
-      # TODO: Check ruby md5 vs md5sum.exe cpu and mem?
 
       class Lib
         PROTECTED = false
@@ -134,6 +134,7 @@ module Six
           end          
         end
 
+        # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def reset(opts = {})
           @logger.info "Resetting!"
           if opts[:hard]
@@ -340,7 +341,6 @@ module Six
           end
         end
 
-        # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def compare_sums(online = true)
           local, remote = Hash.new, Hash.new
           host = config[:hosts].sample

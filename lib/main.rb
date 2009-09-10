@@ -1,24 +1,4 @@
 =begin
-  7za.exe can be used to unpack the gzips!
-  TODO: Move all tool downloads and fetches (even server gits?) to rsync ;-)
-
-2 methods:
-  a) Put the modfolder into a .7z, distribute this .7z together with the updater. The updater will unpack it, and then rsync future updates, with uncompressed files.
-  b) Put each addon in an --rsyncable gzip, initial installation and future updates happen over rsync, with .gz files.
-
-exclude root\.six
-
-Am I Up2date checks seems to be heavy on large repositories
-Hash, in yaml, with md5 sums, and version number sounds like the only logical solution ?,
-verify this file in server for verifying same status ?
-maybe also write md5 checklist of client too.
-
-second thought, without -I,  and with   --times, it goes quick as fuck due to filedate/size comparison!
-rsync --times -O --no-whole-file -r --delete --stats --progress rsync://dev-heaven.net/rel/caa1 .
-
-However, better to work with an md5 sum file :D
-Just 2 lists to maintain :O unpacked and packed :O
-  
 
 =end
 
@@ -84,18 +64,6 @@ repositories.each do |r|
   #rs.reset(:hard => true)
   rs.update
 end
-=begin
-repositories.each do |r|
-  url = File.join(host, r, '/.')
-  begin
-    Rsync.clone(url, r, :path => dir, :log => log)
-  rescue
-    log.error "Survived exception!"
-  end
-end
-=end
-#rs = Rsync.clone(host, folder, :path => dir, :log => log)
-#rs = Rsync.open(dir)
 
 module Six
   module Repositories
