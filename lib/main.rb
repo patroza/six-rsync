@@ -1,5 +1,10 @@
 =begin
-
+        # Nasty workaround for cygwin on Vista vs XP, vs acl's
+        @config[:app_path][/\A(\w\:)/]
+        str = "#{$1}/ /six-app-root ntfs noacl 0 0"
+        etc = File.join(TOOL_PATH, 'etc')
+        FileUtils.mkdir_p etc
+        File.open(File.join(etc, 'fstab'), 'w') { |file| file.puts str }
 =end
 
 require 'log4r'

@@ -75,22 +75,22 @@ module Six
             config[:hosts] << repository
           end
 
-          begin
+         # begin
             init
 
             # TODO: Eval move to update?
             arr_opts = []
             arr_opts << "-I" if opts[:force]
-            begin
+          #  begin
               update('', arr_opts)
-            rescue
-              @logger.error "Unable to sucessfully update, aborting..."
+          #  rescue
+          #    @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
-              FileUtils.rm_rf @rsync_work_dir
-            end
-          rescue
-            @logger.error "Unable to initialize"
-          end
+           #   FileUtils.rm_rf @rsync_work_dir
+           # end
+         # rescue
+          #  @logger.error "Unable to initialize"
+          #end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
@@ -603,7 +603,7 @@ module Six
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
-            rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
+            rsync_cmd.gsub!(drive, "\"/six-app-root") # /cygdrive/#{$1}
           end
 
           out = nil
