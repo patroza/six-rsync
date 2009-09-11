@@ -435,12 +435,12 @@ module Six
             @logger.info "#{typ} Match!"
           else
             mismatch = []
-            @logger.info "#{typ} NOT match!"
+            @logger.info "#{typ} NOT match, updating!"
             remote[typ][:list].each_pair do |key, value|
               if value == local[typ][:list][key]
                 #@logger.info "Match! #{key}"
               else
-                @logger.info "Mismatch! #{key}"
+                @logger.debug "Mismatch! #{key}"
                 mismatch << key
               end
             end
