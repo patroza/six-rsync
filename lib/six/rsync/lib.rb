@@ -292,18 +292,22 @@ module Six
         private
         def unpack_file(file, path)
           Dir.chdir(path) do |dir|
-            out = %x[7za x #{esc(file)} -y]
-            @logger.debug out
+            zip7(file)
             if file[/\.tar\.?/]
               file[/(.*)\/(.*)/]
               fil = $2
               fil = file unless fil
               f2 = fil.gsub('.gz', '')
-              out = %x[7za x #{esc(f2)} -y]
-              @logger.debug out
+              zip7(f2)
               FileUtils.rm_f f2
             end
           end
+        end
+
+        def zip7(file)
+          out = %x[7za x #{esc(file)} -y]
+          @logger.debug out
+          out
         end
 
         def unpack(opts = {})
