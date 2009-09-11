@@ -50,7 +50,15 @@ p rs
 dir = "C:/packaging/rsync"
 host = "rsync://dev-heaven.net/rel"
 hosts = ["rsync://dev-heaven.net/rel", "rsync://s01.6thsense.eu/rel", "rsync://s02.6thsense.eu/rel"]
-repositories = ["cba", "ace", "acex", "six", "beta", "caa1"]
+#repositories = ["cba", "ace", "acex", "six", "beta", "caa1"]
+repositories = %w[
+  sowmod
+  lang_cz-en
+  lang_de-en
+  lang_hu-en
+  six_sap_clutter
+  six_vop_sound
+]
 repositories.each do |r|
   urls = []
   hosts.each do |host|

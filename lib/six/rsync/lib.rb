@@ -154,18 +154,19 @@ module Six
             reg = /#{@rsync_work_dir}[\\|\/]/
 
             change = false
+            i = 0
             ar.each do |file|
+              i += 1
               unless file[/\.gz\Z/]
                 relative = file.gsub(reg, '')
                 checksum = md5(file)
                 if checksum != remote_wd[:list][relative]
                   change = true
-                  @logger.info "Packing #{file}"
-                  system "gzip --best --rsyncable --keep #{file}"
+                  @logger.info "Packing #{i}/#{ar.size}: #{file}"
+                  system "gzip -f --best --rsyncable --keep #{esc(file)}"
                   remote_wd[:list][relative] = checksum
                   remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
                   FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
-
                 end
               end
             end
@@ -202,11 +203,14 @@ module Six
               relative = file.gsub(reg, '')
               checksum = md5(file)
               if checksum != remote_wd[:list][relative]
+                relative[/(.*)\/(.*)/]
+                folder = $1
                 change = true
                 @logger.info "Packing #{file}"
-                system "gzip --best --rsyncable --keep #{file}"
+                system "gzip -f --best --rsyncable --keep #{esc(file)}"
                 remote_wd[:list][relative] = checksum
                 remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
+                FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack', folder) if folder
                 FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
               end
             end
@@ -220,7 +224,12 @@ module Six
 
             host = config[:hosts].sample
             verfile_srv = File.join(".pack", ".version")
-            fetch_file(verfile_srv, host)
+            begin
+              fetch_file(verfile_srv, host)
+            rescue
+              # FIXME: Should never assume that :)
+              @logger.warn "Unable to retrieve version file from server, assuming new repository"
+            end
             ver = read_version
 
             verfile = File.join('.rsync', '.version')
@@ -529,6 +538,8 @@ module Six
           verfile = File.join(@rsync_work_dir, '.pack', '.version')
           if FileTest.exist?(verfile)
             File.open(verfile) {|file| file.read.to_i }
+          else
+            0
           end
         end
 
@@ -551,7 +562,7 @@ module Six
             path[/(.*)[\/|\\](.*)/]
             folder, file = $1, $2
             Dir.chdir(folder) do
-              r = %x[md5sum "#{file}"]
+              r = %x[md5sum #{esc(file)}]
               r[/\A\w*/]
             end
             #File.open(file) do |file|
