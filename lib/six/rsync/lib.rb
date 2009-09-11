@@ -1,4 +1,5 @@
 # TODO: Add Rsync add, commit and push (Update should be pull?), either with staging like area like Git, or add is pack into .pack, and commit is update sum ?
+# TODO: Seperate command lib from custom layer over rsync?
 
 module Six
   module Repositories
@@ -142,6 +143,140 @@ module Six
           end
         end
 
+        def add(file)
+          @logger.error "Please use commit instead!"
+          return
+          @logger.info "Adding #{file}"
+          if (file == ".")
+            remote_wd = load_remote(:wd)
+            remote_pack = load_remote(:pack)
+            ar = Dir[File.join(@rsync_work_dir, '/**/*')]
+            reg = /#{@rsync_work_dir}[\\|\/]/
+
+            change = false
+            ar.each do |file|
+              unless file[/\.gz\Z/]
+                relative = file.gsub(reg, '')
+                checksum = md5(file)
+                if checksum != remote_wd[:list][relative]
+                  change = true
+                  @logger.info "Packing #{file}"
+                  system "gzip --best --rsyncable --keep #{file}"
+                  remote_wd[:list][relative] = checksum
+                  remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
+                  FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
+
+                end
+              end
+            end
+            if change
+              File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
+              File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
+            end
+          else
+
+          end
+        end
+
+        def commit
+          @logger.info "Committing changes on #{@rsync_work_dir}"
+          @config = read_config
+          unless @config
+            @logger.error "Not an Rsync repository!"
+            return
+          end
+
+          unless config[:hosts].size > 0
+            @logger.error "No hosts configured!"
+            return
+          end
+
+          remote_wd = load_remote(:wd)
+          remote_pack = load_remote(:pack)
+          ar = Dir[File.join(@rsync_work_dir, '/**/*')]
+          reg = /#{@rsync_work_dir}[\\|\/]/
+
+          change = false
+          ar.each do |file|
+            unless file[/\.gz\Z/]
+              relative = file.gsub(reg, '')
+              checksum = md5(file)
+              if checksum != remote_wd[:list][relative]
+                change = true
+                @logger.info "Packing #{file}"
+                system "gzip --best --rsyncable --keep #{file}"
+                remote_wd[:list][relative] = checksum
+                remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
+                FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
+              end
+            end
+          end
+
+          if change
+            File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
+            File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
+
+            cmd = ''
+
+            host = config[:hosts].sample
+            verfile_srv = File.join(".pack", ".version")
+            fetch_file(verfile_srv, host)
+            ver = read_version
+
+            verfile = File.join('.rsync', '.version')
+            if FileTest.exist?(File.join(@rsync_work_dir, verfile))
+              File.open(File.join(@rsync_work_dir, verfile)) {|file| @version = file.read.to_i }
+            end
+            @version = 0 unless @version
+            @version += 1
+            if @version < ver # && !force
+              @logger.warn "WARNING, version on server is NEWER, aborting!"
+              raise RsyncExecuteError
+            end
+
+            write_version
+            FileUtils.cp(File.join(@rsync_work_dir, verfile), File.join(@rsync_work_dir, verfile_srv))
+
+            arr_opts = []
+            arr_opts << PARAMS
+
+            # TODO: UNCLUSTERFUCK
+
+            # Upload .pack changes
+            if host[/\A(\w)*\@/]
+              arr_opts << "-e ssh"
+            end
+            arr_opts << esc(File.join(@rsync_work_dir, '.pack/.'))
+            arr_opts << esc(File.join(host, '.pack'))
+
+            command(cmd, arr_opts)
+
+            arr_opts = []
+            arr_opts << PARAMS
+
+
+            # TODO: UNCLUSTERFUCK
+            if host[/\A(\w)*\@/]
+              arr_opts << "-e ssh"
+            end
+
+            arr_opts << esc(File.join(@rsync_work_dir, '.pack', '.sums.yml'))
+            arr_opts << esc(File.join(host, '.pack'))
+            command(cmd, arr_opts)
+
+            arr_opts = []
+            arr_opts << PARAMS
+
+            # TODO: UNCLUSTERFUCK
+            if host[/\A(\w)*\@/]
+              arr_opts << "-e ssh"
+            end
+            arr_opts << esc(File.join(@rsync_work_dir, '.sums.yml'))
+            arr_opts << esc(host)
+            command(cmd, arr_opts)
+          end
+        end
+
         private
         def unpack_file(file, path)
           Dir.chdir(path) do |dir|
@@ -203,6 +338,9 @@ module Six
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
+          if host[/\A(\w)*\@/]
+            arr_opts << "-e ssh"
+          end
           arr_opts << esc(File.join(host, path))
           arr_opts << esc(File.join(@rsync_work_dir, folder))
 
@@ -343,34 +481,55 @@ module Six
 
         def compare_sums(online = true)
           local, remote = Hash.new, Hash.new
-          host = config[:hosts].sample
+          hosts = config[:hosts].clone
+          done = true
 
           ## Pack
           if online
-            verfile = File.join(".pack", ".version")
-            fetch_file(verfile, host)
-            ver = nil
-            if FileTest.exist?(File.join(@rsync_work_dir, verfile))
-              File.open(File.join(@rsync_work_dir, verfile)) {|file| ver = file.read.to_i }
-            end
+            done = false
+            while hosts.size > 0 && !done do
+              host = hosts.sample
+              hosts -= [host]
+              begin
+                verfile = File.join(".pack", ".version")
+                fetch_file(verfile, host)
+                ver = read_version
 
-            verfile = File.join(@rsync_work_dir, '.rsync', '.version')
-            if FileTest.exist?(verfile)
-              File.open(verfile) {|file| @version = file.read.to_i }
+                verfile = File.join(@rsync_work_dir, '.rsync', '.version')
+                if FileTest.exist?(verfile)
+                  File.open(verfile) {|file| @version = file.read.to_i }
+                end
+
+                @version = 0 unless @version
+                if @version > ver # && !force
+                  @logger.warn "WARNING, version on server is OLDER, aborting!"
+                  raise RsyncExecuteError
+                end
+                fetch_file(File.join(".pack", ".sums.yml"), host)
+                done = true
+              rescue
+                @logger.debug "Failed #{host}, trying next.."
+              end
             end
-            @version = 0 unless @version
-            if @version > ver # && !force
-              @logger.warn "WARNING, version on server is OLDER, aborting!"
-              raise RsyncExecuteError
-            end
-            fetch_file(File.join(".pack", ".sums.yml"), host)
           end
-          # TODO: Don't do actions when not online
-          compare_set(local, remote, :pack, host)
+          if done
+            # TODO: Don't do actions when not online
+            compare_set(local, remote, :pack, host)
 
-          ## Working Directory
-          fetch_file('.sums.yml', host) if online
-          compare_set(local, remote, :wd, host)
+            ## Working Directory
+            fetch_file('.sums.yml', host) if online
+            compare_set(local, remote, :wd, host)
+
+            @version = read_version
+            write_version
+          end
+        end
+
+        def read_version
+          verfile = File.join(@rsync_work_dir, '.pack', '.version')
+          if FileTest.exist?(verfile)
+            File.open(verfile) {|file| file.read.to_i }
+          end
         end
 
         def write_version

@@ -81,6 +81,14 @@ module Six
           lib.reset(opts)
         end
 
+        def add(file = '')
+          lib.add(file)
+        end
+
+        def commit
+          lib.commit
+        end
+
         # returns a reference to the working directory
         #  @rsync.dir.path
         #  @rsync.dir.writeable?

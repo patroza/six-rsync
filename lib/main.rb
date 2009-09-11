@@ -57,12 +57,14 @@ repositories.each do |r|
     urls << File.join(host, r, '/.')
   end
 
-  Rsync.clone(urls, r, :path => dir, :log => log)
+ # Rsync.clone(urls, r, :path => dir, :log => log)
 
   rs = Rsync.open(File.join(dir, r), :log => log)
+  #rs.add('.') # bah!
+  rs.commit
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
-  rs.update
+  #rs.update
 end
 
 module Six
