@@ -75,10 +75,10 @@ repositories.each do |r|
 
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!
-  rs.commit
+  #rs.commit
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
-  #rs.update
+  rs.update
 end
 
 module Six
