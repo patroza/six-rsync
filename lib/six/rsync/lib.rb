@@ -163,7 +163,7 @@ module Six
                 if checksum != remote_wd[:list][relative]
                   change = true
                   @logger.info "Packing #{i}/#{ar.size}: #{file}"
-                  system "gzip -f --best --rsyncable --keep #{esc(file)}"
+                  gzip(file)
                   remote_wd[:list][relative] = checksum
                   remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
                   FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
@@ -198,7 +198,9 @@ module Six
           reg = /#{@rsync_work_dir}[\\|\/]/
 
           change = false
+          i = 0
           ar.each do |file|
+            i += 1
             unless file[/\.gz\Z/]
               relative = file.gsub(reg, '')
               checksum = md5(file)
@@ -206,8 +208,8 @@ module Six
                 relative[/(.*)\/(.*)/]
                 folder = $1
                 change = true
-                @logger.info "Packing #{file}"
-                system "gzip -f --best --rsyncable --keep #{esc(file)}"
+                @logger.info "Packing #{i}/#{ar.size}: #{file}"
+                gzip(file)
                 remote_wd[:list][relative] = checksum
                 remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
                 FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack', folder) if folder
@@ -228,7 +230,8 @@ module Six
               fetch_file(verfile_srv, host)
             rescue
               # FIXME: Should never assume that :)
-              @logger.warn "Unable to retrieve version file from server, assuming new repository"
+              @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
+              raise RsyncExecuteError
             end
             ver = read_version
 
@@ -289,13 +292,15 @@ module Six
         private
         def unpack_file(file, path)
           Dir.chdir(path) do |dir|
-            system "7za x \"#{file}\" -y"
+            out = %x[7za x #{esc(file)} -y]
+            @logger.debug out
             if file[/\.tar\.?/]
               file[/(.*)\/(.*)/]
               fil = $2
               fil = file unless fil
               f2 = fil.gsub('.gz', '')
-              system "7za x \"#{f2}\" -y"
+              out = %x[7za x #{esc(f2)} -y]
+              @logger.debug out
               FileUtils.rm_f f2
             end
           end
@@ -557,12 +562,19 @@ module Six
           FileUtils.rm_f File.join(@rsync_work_dir, file)
         end
 
+        def gzip(file)
+          @logger.info "Packing #{file}"
+          out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
+          @logger.debug out
+        end
+
         def md5(path)
           unless File.directory? path
             path[/(.*)[\/|\\](.*)/]
             folder, file = $1, $2
             Dir.chdir(folder) do
               r = %x[md5sum #{esc(file)}]
+              @logger.debug r
               r[/\A\w*/]
             end
             #File.open(file) do |file|
