@@ -81,14 +81,14 @@ module Six
             # TODO: Eval move to update?
             arr_opts = []
             arr_opts << "-I" if opts[:force]
-          #  begin
+            begin
               update('', arr_opts)
-          #  rescue
-          #    @logger.error "Unable to sucessfully update, aborting..."
+            rescue
+              @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
-           #   FileUtils.rm_rf @rsync_work_dir
-           # end
-         # rescue
+              FileUtils.rm_rf @rsync_work_dir
+            end
+          #rescue
           #  @logger.error "Unable to initialize"
           #end
 
