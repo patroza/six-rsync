@@ -1,6 +1,7 @@
 =begin
         # Nasty workaround for cygwin on Vista vs XP, vs acl's
         @config[:app_path][/\A(\w\:)/]
+        ENV['six-app-root'] = '/six-app-root'
         str = "#{$1}/ /six-app-root ntfs noacl 0 0"
         etc = File.join(TOOL_PATH, 'etc')
         FileUtils.mkdir_p etc
@@ -53,6 +54,14 @@ p rs
 
 #dir = "C:/games/arma2"
 dir = "C:/packaging/rsync"
+ENV['six-app-root'] = '/six-app-root'
+dir[/\A(\w\:)/]
+str = "#{$1}/ /six-app-root ntfs noacl 0 0"
+etc = File.join(TOOL_PATH, 'etc')
+FileUtils.mkdir_p etc
+File.open(File.join(etc, 'fstab'), 'w') { |file| file.puts str }
+
+
 host = "rsync://dev-heaven.net/rel"
 hosts = ["rsync://dev-heaven.net/rel", "rsync://s01.6thsense.eu/rel", "rsync://s02.6thsense.eu/rel"]
 #repositories = []

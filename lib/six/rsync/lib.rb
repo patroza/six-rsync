@@ -603,7 +603,11 @@ module Six
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
-            rsync_cmd.gsub!(drive, "\"/six-app-root") # /cygdrive/#{$1}
+            if ENV['six-app-root']
+              rsync_cmd.gsub!(drive, "\"#{ENV['six-app-root']}") # /cygdrive/#{$1}
+            else
+              rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
+            end
           end
 
           out = nil
