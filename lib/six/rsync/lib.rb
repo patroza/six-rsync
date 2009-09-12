@@ -161,14 +161,16 @@ module Six
             remote_wd = load_remote(:wd)
             remote_pack = load_remote(:pack)
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-            reg = /#{@rsync_work_dir}[\\|\/]/
 
             change = false
             i = 0
             ar.each do |file|
               i += 1
               unless file[/\.gz\Z/]
-                relative = file.gsub(reg, '')
+                relative = file.clone
+                relative.gsub!(@rsync_work_dir, '')
+                relative.gsub!(/\A[\\|\/]/, '')
+
                 checksum = md5(file)
                 if checksum != remote_wd[:list][relative]
                   change = true
@@ -205,14 +207,15 @@ module Six
           remote_wd = load_remote(:wd)
           remote_pack = load_remote(:pack)
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-          reg = /#{@rsync_work_dir}[\\|\/]/
 
           change = false
           i = 0
           ar.each do |file|
             i += 1
             unless file[/\.gz\Z/]
-              relative = file.gsub(reg, '')
+              relative = file.clone
+              relative.gsub!(@rsync_work_dir, '')
+              relative.gsub!(/\A[\\|\/]/, '')
               checksum = md5(file)
               if checksum != remote_wd[:list][relative]
                 relative[/(.*)\/(.*)/]
@@ -329,10 +332,15 @@ module Six
 
           items.each do |file|
             unless File.directory? file
-              relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
+              relative = file.clone
+              relative.gsub!(@rsync_work_dir, '')
+              relative.gsub!(/\A[\\|\/]\.pack[\\|\/]/, '')
+              #puts "WorkDir: #{@rsync_work_dir}"
+              #relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
               fil = relative
               folder = "."
               folder, fil = $1, $2 if relative[/(.*)\/(.*)/]
+              #puts "Relative: #{relative}, Folder: #{folder}, File: #{fil} (Origin: #{file})"
 
               path = File.join(@rsync_work_dir, folder)
               FileUtils.mkdir_p path
@@ -385,14 +393,17 @@ module Six
           reg = case typ
           when :pack
             ar = Dir[File.join(@rsync_work_dir, '/.pack/**/*')]
-            /#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/
+            /\A[\\|\/]\.pack[\\|\/]/
           when :wd
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-            /#{@rsync_work_dir}[\\|\/]/
+            /\A[\\|\/]/
           end
           h = Hash.new
           ar.each do |file|
-            relative = file.gsub(reg, '')
+            relative = file.clone
+            relative.gsub!(@rsync_work_dir, '')
+            relative.gsub!(reg, '')
+
             sum = md5(file)
             h[relative] = sum if sum
           end
