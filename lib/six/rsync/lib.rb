@@ -75,19 +75,19 @@ module Six
             config[:hosts] << repository
           end
 
-         # begin
-            init
+          # begin
+          init
 
-            # TODO: Eval move to update?
-            arr_opts = []
-            arr_opts << "-I" if opts[:force]
-            begin
-              update('', arr_opts)
-            rescue
-              @logger.error "Unable to sucessfully update, aborting..."
-              # Dangerous? :D
-              FileUtils.rm_rf @rsync_work_dir
-            end
+          # TODO: Eval move to update?
+          arr_opts = []
+          arr_opts << "-I" if opts[:force]
+          begin
+            update('', arr_opts)
+          rescue
+            @logger.error "Unable to sucessfully update, aborting..."
+            # Dangerous? :D
+            FileUtils.rm_rf @rsync_work_dir
+          end
           #rescue
           #  @logger.error "Unable to initialize"
           #end
@@ -601,13 +601,25 @@ module Six
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
+
+          # TODO: Instead move to iniatialize ?
+          etc = File.join(TOOLS_PATH, 'etc')
+          FileUtils.mkdir_p etc
+          fstab = File.join(etc, 'fstab')
+          str = ""
+          str = File.open(fstab) {|file| file.read} if FileTest.exist?(fstab)
+          unless str[/cygdrive/]
+            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
+            File.open(fstab, 'w') {|file| file.puts str}
+          end
+
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
-            if ENV['six-app-root']
-              rsync_cmd.gsub!(drive, "\"#{ENV['six-app-root']}") # /cygdrive/#{$1}
-            else
-              rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
-            end
+            #if ENV['six-app-root']
+            #  rsync_cmd.gsub!(drive, "\"#{ENV['six-app-root']}") # /cygdrive/#{$1}
+            #else
+            rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
+            #end
           end
 
           out = nil

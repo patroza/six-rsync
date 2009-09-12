@@ -25,7 +25,7 @@ module Six
       BASE_PATH = Dir.pwd
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
-      ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH}"
+      ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')}"
       # No meaning on Cygwin 1.7
      # ENV['CYGWIN'] = "nontsec"
 
