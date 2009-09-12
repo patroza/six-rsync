@@ -37,6 +37,16 @@ module Six
             @rsync_work_dir = base[:working_directory]
           end
           @logger = logger
+
+          etc = File.join(TOOLS_PATH, 'etc')
+          FileUtils.mkdir_p etc
+          fstab = File.join(etc, 'fstab')
+          str = ""
+          str = File.open(fstab) {|file| file.read} if FileTest.exist?(fstab)
+          unless str[/cygdrive/]
+            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
+            File.open(fstab, 'w') {|file| file.puts str}
+          end
         end
 
         def init
@@ -601,17 +611,6 @@ module Six
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
-
-          # TODO: Instead move to iniatialize ?
-          etc = File.join(TOOLS_PATH, 'etc')
-          FileUtils.mkdir_p etc
-          fstab = File.join(etc, 'fstab')
-          str = ""
-          str = File.open(fstab) {|file| file.read} if FileTest.exist?(fstab)
-          unless str[/cygdrive/]
-            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
-            File.open(fstab, 'w') {|file| file.puts str}
-          end
 
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
