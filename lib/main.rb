@@ -53,7 +53,7 @@ p rs
 =end
 
 #dir = "C:/games/arma2"
-dir = "C:/packaging/rsync"
+dir = "C:/packaging/rsync_tmp"
 =begin
 ENV['six-app-root'] = '/six-app-root'
 dir[/\A(\w\:)/]
@@ -80,13 +80,17 @@ repositories = %w[
   six_sap_clutter
   six_vop_sound
 ]
+repositories = %w[
+  cba
+  six
+]
 repositories.each do |r|
   urls = []
   hosts.each do |host|
     urls << File.join(host, r, '/.')
   end
 
- # Rsync.clone(urls, r, :path => dir, :log => log)
+ Rsync.clone(urls, r, :path => dir, :log => log)
 
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!

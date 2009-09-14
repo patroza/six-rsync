@@ -27,7 +27,9 @@ module Six
           @rsync_dir = nil
           @rsync_work_dir = nil
           @path = nil
-          @version = nil
+
+          @config_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
+          @config_remote = {:pack => Hash.new, :wd => Hash.new, :version => 0}
 
           if base.is_a?(Rsync::Base)
             @rsync_dir = base.repo.path
@@ -91,13 +93,13 @@ module Six
           # TODO: Eval move to update?
           arr_opts = []
           arr_opts << "-I" if opts[:force]
-          begin
-            update('', arr_opts)
-          rescue
-            @logger.error "Unable to sucessfully update, aborting..."
-            # Dangerous? :D
-            FileUtils.rm_rf @rsync_work_dir
-          end
+          #  begin
+          update('', arr_opts)
+          #  rescue
+          #   @logger.error "Unable to sucessfully update, aborting..."
+          # Dangerous? :D
+          #   FileUtils.rm_rf @rsync_work_dir
+          # end
           #rescue
           #  @logger.error "Unable to initialize"
           #end
@@ -133,12 +135,16 @@ module Six
             arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
 
             command(cmd, arr_opts)
-            write_sums(:pack)
-            write_sums(:wd)
+            [:pack, :wd].each do |t|
+              @config_local[t] = calc_sums(t)
+            end
+            save_config
           else
             #reset(:hard => true)
-            write_sums(:pack)
-            write_sums(:wd)
+            [:pack, :wd].each do |t|
+              @config_local[t] = calc_sums(t)
+            end
+            save_config
 
             # fetch latest sums and only update when changed
             compare_sums
@@ -232,11 +238,13 @@ module Six
           end
 
           if change
-            File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
-            File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
+            @config_local[:pack] = @config_remote[:pack].clone
+            @config_local[:wd] = @config_remote[:wd].clone
+            save_config(:local)
 
             cmd = ''
 
+            # TODO: Change to repositories.yml
             host = config[:hosts].sample
             verfile_srv = File.join(".pack", ".version")
             begin
@@ -248,19 +256,15 @@ module Six
             end
             ver = read_version
 
-            verfile = File.join('.rsync', '.version')
-            if FileTest.exist?(File.join(@rsync_work_dir, verfile))
-              File.open(File.join(@rsync_work_dir, verfile)) {|file| @version = file.read.to_i }
-            end
-            @version = 0 unless @version
-            @version += 1
-            if @version < ver # && !force
+            @config_local[:version] += 1
+            if @config_local[:version] < ver # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
               raise RsyncExecuteError
             end
 
-            write_version
-            FileUtils.cp(File.join(@rsync_work_dir, verfile), File.join(@rsync_work_dir, verfile_srv))
+            @config_remote[:version] = @config_local[:version].clone
+            write_config(:local)
+            write_config(:remote)
 
             arr_opts = []
             arr_opts << PARAMS
@@ -410,17 +414,43 @@ module Six
           h
         end
 
-        def write_sums(typ)
-          h = calc_sums(typ)
+        def save_config
+          config = @config_local.clone
+          config[:pack] = @config_local[:pack].sort
+          config[:wd] = @config_local[:wd].sort
+          File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml'), 'w') { |file| file.puts config.to_yaml }
+        end
+
+        def load_config(typ)
+          config = nil
           case typ
-          when :pack
-            File.open(File.join(@rsync_work_dir, '.rsync', 'sums_pack.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-            #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-          when :wd
-            File.open(File.join(@rsync_work_dir, '.rsync', 'sums_wd.yml'), 'w') { |file| file.puts h.sort.to_yaml }
-            #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts h.sort.to_yaml }
+          when :local
+            File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml')) { |file| config = YAML::load(file) }
+          when :remote
+            if FileTest.exists? File.join(@rsync_work_dir, '.pack', '.repository.yml')
+              File.open(File.join(@rsync_work_dir, '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
+            else
+              [:wd, :pack].each do |t|
+                remote = load_remote(t)
+                @config_remote[t] = remote[:list]
+              end
+              verfile = File.join('.pack', '.version')
+              if FileTest.exist?(File.join(@rsync_work_dir, verfile))
+                File.open(File.join(@rsync_work_dir, verfile)) {|file| @config_remote[:version] = file.read.to_i }
+              end
+            end
           end
-          h
+          [:wd, :pack].each do |t|
+            h = Hash.new
+            config[t].each { |e| h[e[0]] = e[1] }
+            config[t] = h
+          end
+          case typ
+          when :local
+            @config_local = config
+          when :remote
+            @config_remote = config
+          end
         end
 
         def load_sums(file, key)
@@ -434,10 +464,6 @@ module Six
           sum
         end
 
-        def load_local(typ)
-          load_sums(".rsync/sums_#{typ}.yml", typ)
-        end
-
         def load_remote(typ)
           file = case typ
           when :pack
@@ -448,78 +474,81 @@ module Six
           load_sums(file, typ)
         end
 
-        def compare_set(local, remote, typ, host, online = true)
-          local[typ] = load_local(typ)
-          remote[typ] = load_remote(typ)
+        def compare_set(typ, host, online = true)
+          
+          #local[typ] = load_local(typ)
+          #remote[typ] = load_remote(typ)
+          load_config(:local)
+          load_config(:remote)
 
-          if local[typ][:md5] == remote[typ][:md5]
-            @logger.info "#{typ} Match!"
-          else
-            mismatch = []
-            @logger.info "#{typ} NOT match, updating!"
-            remote[typ][:list].each_pair do |key, value|
-              if value == local[typ][:list][key]
-                #@logger.info "Match! #{key}"
-              else
-                @logger.debug "Mismatch! #{key}"
-                mismatch << key
-              end
+          #if local[typ][:md5] == remote[typ][:md5]
+          #  @logger.info "#{typ} Match!"
+          #else
+          # @logger.info "#{typ} NOT match, updating!"
+
+          mismatch = []
+          @config_remote[typ].each_pair do |key, value|
+            if value == @config_local[typ][key]
+              #@logger.info "Match! #{key}"
+            else
+              @logger.debug "Mismatch! #{key}"
+              mismatch << key
             end
+          end
 
-            if mismatch.size > 0
-              case typ
-              when :pack
-                # direct unpack of gz into working folder
-                # Update file
-                if online
-                  # TODO: Progress bar
-                  if mismatch.count > (remote[typ][:list].count / 4)
-                    @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
-                    arr_opts = []
-                    arr_opts << PARAMS
-                    arr_opts << File.join(host, '.pack/.')
-                    arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
+          if mismatch.size > 0
+            case typ
+            when :pack
+              # direct unpack of gz into working folder
+              # Update file
+              if online
+                # TODO: Progress bar
+                if mismatch.count > (remote[typ][:list].count / 4)
+                  @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
+                  arr_opts = []
+                  arr_opts << PARAMS
+                  arr_opts << File.join(host, '.pack/.')
+                  arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
 
-                    command('', arr_opts)
+                  command('', arr_opts)
 
-                  else
-                    c = mismatch.size
-                    i = 0
-                    mismatch.each do |e|
-                      # TODO: Nicer progress bar...
-                      i += 1
-                      @logger.info "Fetching #{i}/#{c}: #{e}"
-                      fetch_file(File.join(".pack", e), host)
-                    end
+                else
+                  c = mismatch.size
+                  i = 0
+                  mismatch.each do |e|
+                    # TODO: Nicer progress bar...
+                    i += 1
+                    @logger.info "Fetching #{i}/#{c}: #{e}"
+                    fetch_file(File.join(".pack", e), host)
                   end
                 end
-              when :wd
-                c = mismatch.size
-                i = 0
-                mismatch.each do |e|
-                  # TODO: Nicer progress bar...
-                  i += 1
-                  @logger.info "Unpacking #{i}/#{c}: #{e}"
-                  unpack(:path => "#{e}.gz")
-                end
+              end
+            when :wd
+              c = mismatch.size
+              i = 0
+              mismatch.each do |e|
+                # TODO: Nicer progress bar...
+                i += 1
+                @logger.info "Unpacking #{i}/#{c}: #{e}"
+                unpack(:path => "#{e}.gz")
               end
             end
-
-            del = []
-            local[typ][:list].each_pair do |key, value|
-              if remote[typ][:list][key].nil?
-                @logger.info "File does not exist in remote! #{key}"
-                del << key
-              end
-            end
-            @logger.info "To delete: #{del.join(',')}" if del.size > 0
-            del.each { |e| del_file(e, typ) }
-            write_sums(typ)
           end
+
+          del = []
+          @config_local[typ].each_pair do |key, value|
+            if @config_remote[typ][key].nil?
+              @logger.info "File does not exist in remote! #{key}"
+              del << key
+            end
+          end
+          @logger.info "To delete: #{del.join(',')}" if del.size > 0
+          del.each { |e| del_file(e, typ) }
+          @config_local[typ] = calc_sums(typ)
+          save_config
         end
 
         def compare_sums(online = true)
-          local, remote = Hash.new, Hash.new
           hosts = config[:hosts].clone
           done = true
 
@@ -529,38 +558,41 @@ module Six
             while hosts.size > 0 && !done do
               host = hosts.sample
               hosts -= [host]
-              begin
+                puts "Dildo"
+            #  begin
+                # TODO: Change to fetch .repository.yml instead
                 verfile = File.join(".pack", ".version")
                 fetch_file(verfile, host)
-                ver = read_version
+                puts "Dildo2"
+                gets
 
-                verfile = File.join(@rsync_work_dir, '.rsync', '.version')
-                if FileTest.exist?(verfile)
-                  File.open(verfile) {|file| @version = file.read.to_i }
-                end
+                load_config(:remote)
+                load_config(:local)
+                puts "Dildo"
+                p @config_local
+                p @config_remote
+                gets
 
-                @version = 0 unless @version
-                if @version > ver # && !force
+                if @config_local[:version] > @config_local[:remote] # && !force
                   @logger.warn "WARNING, version on server is OLDER, aborting!"
                   raise RsyncExecuteError
                 end
                 fetch_file(File.join(".pack", ".sums.yml"), host)
                 done = true
-              rescue
-                @logger.debug "Failed #{host}, trying next.."
-              end
+             # rescue
+             #   @logger.debug "Failed #{host}, trying next.."
+             # end
             end
           end
           if done
             # TODO: Don't do actions when not online
-            compare_set(local, remote, :pack, host)
+            compare_set(:pack, host)
 
             ## Working Directory
             fetch_file('.sums.yml', host) if online
-            compare_set(local, remote, :wd, host)
+            compare_set(:wd, host)
 
-            @version = read_version
-            write_version
+            save_config
           end
         end
 
@@ -573,9 +605,9 @@ module Six
           end
         end
 
-        def write_version
-          File.open(File.join(@rsync_work_dir, '.rsync/.version'), 'w') {|file| file.puts @version }
-        end
+        #        def write_version
+        #          File.open(File.join(@rsync_work_dir, '.rsync/.version'), 'w') {|file| file.puts @version }
+        #        end
 
         def del_file(file, typ, opts = {})
           file = case typ
