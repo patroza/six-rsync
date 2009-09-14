@@ -531,13 +531,9 @@ module Six
             while hosts.size > 0 && !done do
               host = hosts.sample
               hosts -= [host]
-              puts "Dildo"
-              #  begin
-              # TODO: Change to fetch .repository.yml instead
-              begin
-                fetch_file(".pack/.repository.yml", host)
-              rescue
-              end
+
+              fetch_file(".pack/.repository.yml", host)
+
               if FileTest.exists? File.join(@rsync_work_dir, '.rsync', '.pack/.repository.yml')
                 [File.join(@rsync_work_dir, '.rsync', '.pack/.version'), File.join(@rsync_work_dir, '.rsync', '.pack/.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
                   FileUtils.rm_f f  if FileTest.exists? f
