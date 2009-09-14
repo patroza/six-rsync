@@ -120,10 +120,6 @@ module Six
             return
           end
 
-          if FileTest.exists?(File.join(@rsync_work_dir, '.pack'))
-            FileUtils.mv(File.join(@rsync_work_dir, '.pack'), File.join(@rsync_work_dir, '.rsync', '.pack'))
-          end
-
           #unpack
 
           host = config[:hosts].sample
@@ -159,6 +155,12 @@ module Six
         def reset(opts = {})
           @logger.info "Resetting!"
           if opts[:hard]
+            @config = read_config
+            [:pack, :wd].each do |t|
+              @config_local[t] = calc_sums(t)
+            end
+            save_config
+
             compare_sums(false)
           end
         end
@@ -214,6 +216,9 @@ module Six
             return
           end
 
+          load_config(:local)
+          load_config(:remote)
+          # Added or Changed files
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
           change = false
@@ -229,20 +234,40 @@ module Six
                 relative[/(.*)\/(.*)/]
                 folder = $1
                 change = true
-                @logger.info "Packing #{i}/#{ar.size}: #{file}"
+                @logger.info "Packing #{i}/#{ar.size}: #{relative}"
                 gzip(file)
-                @config_remote[:wd][relative] = checksum
-                @config_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
+                @config_local[:wd][relative] = checksum
+                @config_local[:pack]["#{relative}.gz"] = md5("#{file}.gz")
                 FileUtils.mkdir_p File.join(@rsync_work_dir, '.rsync', '.pack', folder) if folder
                 FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.rsync', '.pack', "#{relative}.gz"))
               end
             end
           end
 
-          if change
-            @config_local[:pack] = @config_remote[:pack].clone
-            @config_local[:wd] = @config_remote[:wd].clone
+          # Deleted files
+          ar2 = Dir[File.join(@rsync_work_dir, '/.rsync/.pack/**/*')]
+          i = 0
+          ar2.each do |file|
+            i += 1
+            if file[/\.gz\Z/]
+              relative = file.clone
+              relative.gsub!(@rsync_work_dir, '')
+              relative.gsub!(/\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
+              local = relative.clone
+              local.gsub!(/\.gz\Z/, '')
+              if @config_local[:wd][local].nil?
+                relative[/(.*)\/(.*)/]
+                folder = $1
+                change = true
+                @logger.info "Deleting #{i}/#{ar2.size}: #{relative}"
+                @config_local[:wd].delete local
+                @config_local[:pack].delete relative
+               # FileUtils.rm_f(file)
+              end
+            end
+          end
 
+          if change
             cmd = ''
 
             # TODO: Change to repositories.yml
@@ -255,7 +280,6 @@ module Six
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
               raise RsyncExecuteError
             end
-
             load_config(:remote)
             if @config_local[:version] < @config_remote[:version] # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
@@ -263,14 +287,14 @@ module Six
             end
             @config_local[:version] += 1
             @config_remote[:version] = @config_local[:version]
-
-            save_config(:local)
+            @config_remote[:pack] = @config_local[:pack].clone
+            @config_remote[:wd] = @config_local[:wd].clone
             save_config(:remote)
-
-            arr_opts = []
-            arr_opts << PARAMS
+            save_config(:local)
 
             # TODO: UNCLUSTERFUCK
+            arr_opts = []
+            arr_opts << PARAMS
 
             # Upload .pack changes
             if host[/\A(\w)*\@/]
@@ -281,11 +305,10 @@ module Six
 
             command(cmd, arr_opts)
 
+            # TODO: UNCLUSTERFUCK
             arr_opts = []
             arr_opts << PARAMS
-
-
-            # TODO: UNCLUSTERFUCK
+=begin
             if host[/\A(\w)*\@/]
               arr_opts << "-e ssh"
             end
@@ -293,6 +316,7 @@ module Six
             arr_opts << esc(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml'))
             arr_opts << esc(File.join(host, '.pack'))
             command(cmd, arr_opts)
+=end
           end
         end
 
@@ -348,6 +372,9 @@ module Six
         end
 
         def read_config
+          if FileTest.exists?(File.join(@rsync_work_dir, '.pack'))
+            FileUtils.mv(File.join(@rsync_work_dir, '.pack'), File.join(@rsync_work_dir, '.rsync', '.pack'))
+          end
           read_yaml(File.join(rsync_path, 'config.yml'))
         end
 
@@ -430,7 +457,14 @@ module Six
           when :local
             File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml')) { |file| config = YAML::load(file) }
           when :remote
-            File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
+            if FileTest.exists?(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml'))
+              File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
+            else
+              # Deprecated
+              config[:pack] = File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.sums.yml')) { |file| YAML::load(file) }
+              config[:wd] = File.open(File.join(@rsync_work_dir, '.sums.yml')) { |file| YAML::load(file) }
+              config[:version] = File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.version')) { |file| file.read.to_i }
+            end
           end
           [:wd, :pack].each do |t|
             h = Hash.new
@@ -530,6 +564,7 @@ module Six
 
         def compare_sums(online = true)
           hosts = config[:hosts].clone
+          host = hosts.sample
           done = true
 
           ## Pack

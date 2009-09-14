@@ -53,7 +53,7 @@ p rs
 =end
 
 #dir = "C:/games/arma2"
-dir = "C:/packaging/rsync_tmp"
+dir = "C:/packaging/rsync"
 =begin
 ENV['six-app-root'] = '/six-app-root'
 dir[/\A(\w\:)/]
@@ -80,10 +80,10 @@ repositories = %w[
   six_sap_clutter
   six_vop_sound
 ]
-repositories = %w[
-  cba
-  six
-]
+#repositories = %w[
+#  cba
+#  six
+#]
 repositories.each do |r|
   urls = []
   hosts.each do |host|
