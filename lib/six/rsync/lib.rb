@@ -12,18 +12,12 @@ module Six
 
       class Lib
         PROTECTED = false
-        tmp = Hash.new
-        tmp[:hosts] = []
-        DEFAULT = tmp.to_yaml
+        WINDRIVE = /\"(\w)\:/
+        DEFAULT_CONFIG = {:hosts => []}.to_yaml
         PARAMS = if PROTECTED
           "--dry-run --times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
         else
           "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
-        end
-        WINDRIVE = /\"(\w)\:/
-
-        def esc(val)
-          "\"#{val}\""
         end
 
         def initialize(base = nil, logger = nil)
@@ -141,7 +135,6 @@ module Six
             compare_sums
           end          
         end
-
 
         # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def reset(opts = {})
@@ -301,7 +294,6 @@ module Six
           end
         end
 
-        private
         def compare_set(typ, host, online = true)
           load_repos(:local)
           load_repos(:remote)
@@ -415,8 +407,29 @@ module Six
           end
         end
 
+        private
         def config
-          @config ||= YAML::load(DEFAULT)
+          @config ||= YAML::load(DEFAULT_CONFIG)
+        end
+
+        def rsync_path(path = '')
+          p = File.join(@rsync_work_dir, DIR_RSYNC)
+          p = File.join(p, path) unless path.size == 0
+          p
+        end
+
+        def pack_path(path = '')
+          p = File.join(@rsync_work_dir, DIR_PACK)
+          p = File.join(p, path) unless path.size == 0
+          p
+        end
+
+        def esc(val)
+          "\"#{val}\""
+        end
+
+        def escape(s)
+          "\"" + s.to_s.gsub('\"', '\"\\\"\"') + "\""
         end
 
         def fetch_file(path, host)
@@ -483,7 +496,7 @@ module Six
           save_config(config)
         end
 
-        def save_config(config = YAML::load(DEFAULT))
+        def save_config(config = YAML::load(DEFAULT_CONFIG))
           File.open(File.join(rsync_path, 'config.yml'), 'w') { |file| file.puts config.to_yaml }
         end
 
@@ -517,16 +530,18 @@ module Six
               File.open(pack_path('.repository.yml')) { |file| config = YAML::load(file) }
             else
               # Deprecated
-              config[:pack] = File.open(pack_path('.sums.yml')) { |file| YAML::load(file) }
               config[:wd] = File.open(File.join(@rsync_work_dir, '.sums.yml')) { |file| YAML::load(file) }
+              config[:pack] = File.open(pack_path('.sums.yml')) { |file| YAML::load(file) }
               config[:version] = File.open(pack_path('.version')) { |file| file.read.to_i }
             end
           end
+
           [:wd, :pack].each do |t|
             h = Hash.new
             config[t].each { |e| h[e[0]] = e[1] }
             config[t] = h
           end
+
           case typ
           when :local
             @repos_local = config
@@ -556,6 +571,30 @@ module Six
           FileUtils.rm_f File.join(@rsync_work_dir, file)
         end
 
+        def md5(path)
+          unless File.directory? path
+            path[/(.*)[\/|\\](.*)/]
+            folder, file = $1, $2
+            Dir.chdir(folder) do
+              r = %x[md5sum #{esc(file)}]
+              @logger.debug r
+              r[/\A\w*/]
+            end
+          end
+        end
+
+        def zip7(file)
+          out = %x[7za x #{esc(file)} -y]
+          @logger.debug out
+          out
+        end
+
+        def gzip(file)
+          @logger.info "Packing #{file}"
+          out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
+          @logger.debug out
+        end
+
         def unpack_file(file, path)
           Dir.chdir(path) do |dir|
             zip7(file)
@@ -571,12 +610,6 @@ module Six
             end
 =end
           end
-        end
-
-        def zip7(file)
-          out = %x[7za x #{esc(file)} -y]
-          @logger.debug out
-          out
         end
 
         def unpack(opts = {})
@@ -601,40 +634,6 @@ module Six
               unpack_file(file, path)
             end
           end
-        end
-
-        def gzip(file)
-          @logger.info "Packing #{file}"
-          out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
-          @logger.debug out
-        end
-
-        def md5(path)
-          unless File.directory? path
-            path[/(.*)[\/|\\](.*)/]
-            folder, file = $1, $2
-            Dir.chdir(folder) do
-              r = %x[md5sum #{esc(file)}]
-              @logger.debug r
-              r[/\A\w*/]
-            end
-          end
-        end
-
-        def rsync_path(path = '')
-          p = File.join(@rsync_work_dir, DIR_RSYNC)
-          p = File.join(p, path) unless path.size == 0
-          p
-        end
-
-        def pack_path(path = '')
-          p = File.join(@rsync_work_dir, DIR_PACK)
-          p = File.join(p, path) unless path.size == 0
-          p
-        end
-
-        def escape(s)
-          "\"" + s.to_s.gsub('\"', '\"\\\"\"') + "\""
         end
 
         def command_lines(cmd, opts = [], chdir = true, redirect = '')
