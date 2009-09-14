@@ -65,7 +65,7 @@ module Six
           end
           FileUtils.mkdir_p rsync_path
           # TODO: .pack path should be formulized
-          FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack')
+          FileUtils.mkdir_p File.join(@rsync_work_dir, '.rsync', '.pack')
           write_config(config)
         end
 
@@ -120,6 +120,10 @@ module Six
             return
           end
 
+          if FileTest.exists?(File.join(@rsync_work_dir, '.pack'))
+            FileUtils.mv(File.join(@rsync_work_dir, '.pack'), File.join(@rsync_work_dir, '.rsync', '.pack'))
+          end
+
           #unpack
 
           host = config[:hosts].sample
@@ -132,7 +136,7 @@ module Six
 
             # TODO: UNCLUSTERFUCK
             arr_opts << esc(File.join(host, '.pack/.'))
-            arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
+            arr_opts << esc(File.join(@rsync_work_dir, '.rsync', '.pack'))
 
             command(cmd, arr_opts)
             [:pack, :wd].each do |t|
@@ -183,14 +187,14 @@ module Six
                   gzip(file)
                   @config_remote[:wd][relative] = checksum
                   @config_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
-                  FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
+                  FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.rsync', '.pack', "#{relative}.gz"))
                 end
               end
             end
             if change
               save_config
               #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
-              #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
+              #File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
             end
           else
 
@@ -229,8 +233,8 @@ module Six
                 gzip(file)
                 @config_remote[:wd][relative] = checksum
                 @config_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
-                FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack', folder) if folder
-                FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
+                FileUtils.mkdir_p File.join(@rsync_work_dir, '.rsync', '.pack', folder) if folder
+                FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.rsync', '.pack', "#{relative}.gz"))
               end
             end
           end
@@ -273,7 +277,7 @@ module Six
             if host[/\A(\w)*\@/]
               arr_opts << "-e ssh"
             end
-            arr_opts << esc(File.join(@rsync_work_dir, '.pack/.'))
+            arr_opts << esc(File.join(@rsync_work_dir, '.rsync', '.pack/.'))
             arr_opts << esc(File.join(host, '.pack'))
 
             command(cmd, arr_opts)
@@ -287,7 +291,7 @@ module Six
               arr_opts << "-e ssh"
             end
 
-            arr_opts << esc(File.join(@rsync_work_dir, '.pack', '.repository.yml'))
+            arr_opts << esc(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml'))
             arr_opts << esc(File.join(host, '.pack'))
             command(cmd, arr_opts)
           end
@@ -316,9 +320,9 @@ module Six
 
         def unpack(opts = {})
           items = if opts[:path]
-            [File.join(@rsync_work_dir, '.pack', opts[:path])]
+            [File.join(@rsync_work_dir, '.rsync', '.pack', opts[:path])]
           else
-            Dir[File.join(@rsync_work_dir, '.pack/**/*')]
+            Dir[File.join(@rsync_work_dir, '.rsync', '.pack/**/*')]
           end
 
           items.each do |file|
@@ -369,7 +373,7 @@ module Six
             arr_opts << "-e ssh"
           end
           arr_opts << esc(File.join(host, path))
-          arr_opts << esc(File.join(@rsync_work_dir, folder))
+          arr_opts << esc(File.join(@rsync_work_dir, '.rsync', folder))
 
           command('', arr_opts)
         end
@@ -383,8 +387,8 @@ module Six
           ar = []
           reg = case typ
           when :pack
-            ar = Dir[File.join(@rsync_work_dir, '/.pack/**/*')]
-            /\A[\\|\/]\.pack[\\|\/]/
+            ar = Dir[File.join(@rsync_work_dir, '.rsync', '/.pack/**/*')]
+            /\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
           when :wd
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
             /\A[\\|\/]/
@@ -418,7 +422,7 @@ module Six
           when :local
             File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml')) { |file| config = YAML::load(file) }
           when :remote
-            File.open(File.join(@rsync_work_dir, '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
+            File.open(File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
           end
           [:wd, :pack].each do |t|
             h = Hash.new
@@ -476,7 +480,7 @@ module Six
                   arr_opts = []
                   arr_opts << PARAMS
                   arr_opts << File.join(host, '.pack/.')
-                  arr_opts << esc(File.join(@rsync_work_dir, '.pack'))
+                  arr_opts << esc(File.join(@rsync_work_dir, '.rsync', '.pack'))
 
                   command('', arr_opts)
 
@@ -534,20 +538,14 @@ module Six
                 fetch_file(".pack/.repository.yml", host)
               rescue
               end
-              if FileTest.exists? File.join(@rsync_work_dir, ".pack/.repository.yml")
-                [File.join(@rsync_work_dir, '.pack/.version'), File.join(@rsync_work_dir, '.pack/.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
+              if FileTest.exists? File.join(@rsync_work_dir, '.rsync', '.pack/.repository.yml')
+                [File.join(@rsync_work_dir, '.rsync', '.pack/.version'), File.join(@rsync_work_dir, '.rsync', '.pack/.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
                   FileUtils.rm_f f  if FileTest.exists? f
                 end
-              else
-                fetch_file(".pack/.version", host)
-                fetch_file(".sums.yml", host)
-                fetch_file(File.join(".pack", ".sums.yml"), host)
               end
 
               load_config(:remote)
               load_config(:local)
-              p @config_local
-              p @config_remote
 
               if @config_local[:version] > @config_remote[:version] # && !force
                 @logger.warn "WARNING, version on server is OLDER, aborting!"
@@ -568,7 +566,7 @@ module Six
         end
 
         def read_version
-          verfile = File.join(@rsync_work_dir, '.pack', '.version')
+          verfile = File.join(@rsync_work_dir, '.rsync', '.pack', '.version')
           if FileTest.exist?(verfile)
             File.open(verfile) {|file| file.read.to_i }
           else
