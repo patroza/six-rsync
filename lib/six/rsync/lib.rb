@@ -328,7 +328,7 @@ module Six
             unless File.directory? file
               relative = file.clone
               relative.gsub!(@rsync_work_dir, '')
-              relative.gsub!(/\A[\\|\/]\.pack[\\|\/]/, '')
+              relative.gsub!(/\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
               #puts "WorkDir: #{@rsync_work_dir}"
               #relative = file.gsub(/#{@rsync_work_dir}[\\|\/]\.pack[\\|\/]/, '')
               fil = relative
@@ -460,7 +460,6 @@ module Six
           
           load_config(:local)
           load_config(:remote)
-
           #if local[typ][:md5] == remote[typ][:md5]
           #  @logger.info "#{typ} Match!"
           #else

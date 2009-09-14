@@ -90,8 +90,10 @@ repositories.each do |r|
     urls << File.join(host, r, '/.')
   end
 
- Rsync.clone(urls, r, :path => dir, :log => log)
-
+  begin
+    Rsync.clone(urls, r, :path => dir, :log => log)
+  rescue
+  end
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!
   #rs.commit
