@@ -164,8 +164,7 @@ module Six
           return
           @logger.info "Adding #{file}"
           if (file == ".")
-            remote_wd = load_remote(:wd)
-            remote_pack = load_remote(:pack)
+            load_config(:remote)
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
             change = false
@@ -178,19 +177,20 @@ module Six
                 relative.gsub!(/\A[\\|\/]/, '')
 
                 checksum = md5(file)
-                if checksum != remote_wd[:list][relative]
+                if checksum != @config_remote[:wd][relative]
                   change = true
                   @logger.info "Packing #{i}/#{ar.size}: #{file}"
                   gzip(file)
-                  remote_wd[:list][relative] = checksum
-                  remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
+                  @config_remote[:wd][relative] = checksum
+                  @config_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
                   FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
                 end
               end
             end
             if change
-              File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
-              File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
+              save_config
+              #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
+              #File.open(File.join(@rsync_work_dir, '.pack', '.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
             end
           else
 
@@ -210,8 +210,6 @@ module Six
             return
           end
 
-          remote_wd = load_remote(:wd)
-          remote_pack = load_remote(:pack)
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
           change = false
@@ -223,14 +221,14 @@ module Six
               relative.gsub!(@rsync_work_dir, '')
               relative.gsub!(/\A[\\|\/]/, '')
               checksum = md5(file)
-              if checksum != remote_wd[:list][relative]
+              if checksum != @config_remote[:wd][relative]
                 relative[/(.*)\/(.*)/]
                 folder = $1
                 change = true
                 @logger.info "Packing #{i}/#{ar.size}: #{file}"
                 gzip(file)
-                remote_wd[:list][relative] = checksum
-                remote_pack[:list]["#{relative}.gz"] = md5("#{file}.gz")
+                @config_remote[:wd][relative] = checksum
+                @config_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
                 FileUtils.mkdir_p File.join(@rsync_work_dir, '.pack', folder) if folder
                 FileUtils.mv("#{file}.gz", File.join(@rsync_work_dir, '.pack', "#{relative}.gz"))
               end
@@ -240,7 +238,7 @@ module Six
           if change
             @config_local[:pack] = @config_remote[:pack].clone
             @config_local[:wd] = @config_remote[:wd].clone
-            save_config(:local)
+            save_config
 
             cmd = ''
 
@@ -289,19 +287,8 @@ module Six
               arr_opts << "-e ssh"
             end
 
-            arr_opts << esc(File.join(@rsync_work_dir, '.pack', '.sums.yml'))
+            arr_opts << esc(File.join(@rsync_work_dir, '.pack', '.repository.yml'))
             arr_opts << esc(File.join(host, '.pack'))
-            command(cmd, arr_opts)
-
-            arr_opts = []
-            arr_opts << PARAMS
-
-            # TODO: UNCLUSTERFUCK
-            if host[/\A(\w)*\@/]
-              arr_opts << "-e ssh"
-            end
-            arr_opts << esc(File.join(@rsync_work_dir, '.sums.yml'))
-            arr_opts << esc(host)
             command(cmd, arr_opts)
           end
         end
@@ -419,26 +406,19 @@ module Six
           config[:pack] = @config_local[:pack].sort
           config[:wd] = @config_local[:wd].sort
           File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml'), 'w') { |file| file.puts config.to_yaml }
+          [File.join(@rsync_work_dir, '.rsync/.version'), File.join(@rsync_work_dir, '.rsync/sums_pack.yml'), File.join(@rsync_work_dir, '.rsync/sums_wd.yml')].each do |f|
+            FileUtils.rm_f f  if FileTest.exists? f
+          end
+
         end
 
         def load_config(typ)
-          config = nil
+          config = Hash.new
           case typ
           when :local
             File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml')) { |file| config = YAML::load(file) }
           when :remote
-            if FileTest.exists? File.join(@rsync_work_dir, '.pack', '.repository.yml')
-              File.open(File.join(@rsync_work_dir, '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
-            else
-              [:wd, :pack].each do |t|
-                remote = load_remote(t)
-                @config_remote[t] = remote[:list]
-              end
-              verfile = File.join('.pack', '.version')
-              if FileTest.exist?(File.join(@rsync_work_dir, verfile))
-                File.open(File.join(@rsync_work_dir, verfile)) {|file| @config_remote[:version] = file.read.to_i }
-              end
-            end
+            File.open(File.join(@rsync_work_dir, '.pack', '.repository.yml')) { |file| config = YAML::load(file) }
           end
           [:wd, :pack].each do |t|
             h = Hash.new
@@ -464,20 +444,8 @@ module Six
           sum
         end
 
-        def load_remote(typ)
-          file = case typ
-          when :pack
-            ".pack/.sums.yml"
-          when :wd
-            ".sums.yml"
-          end
-          load_sums(file, typ)
-        end
-
         def compare_set(typ, host, online = true)
           
-          #local[typ] = load_local(typ)
-          #remote[typ] = load_remote(typ)
           load_config(:local)
           load_config(:remote)
 
@@ -503,7 +471,7 @@ module Six
               # Update file
               if online
                 # TODO: Progress bar
-                if mismatch.count > (remote[typ][:list].count / 4)
+                if mismatch.count > (@config_remote[typ].count / 4)
                   @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                   arr_opts = []
                   arr_opts << PARAMS
@@ -545,6 +513,7 @@ module Six
           @logger.info "To delete: #{del.join(',')}" if del.size > 0
           del.each { |e| del_file(e, typ) }
           @config_local[typ] = calc_sums(typ)
+          @config_local[:version] = @config_remote[:version]
           save_config
         end
 
@@ -558,40 +527,42 @@ module Six
             while hosts.size > 0 && !done do
               host = hosts.sample
               hosts -= [host]
-                puts "Dildo"
-            #  begin
-                # TODO: Change to fetch .repository.yml instead
-                verfile = File.join(".pack", ".version")
-                fetch_file(verfile, host)
-                puts "Dildo2"
-                gets
-
-                load_config(:remote)
-                load_config(:local)
-                puts "Dildo"
-                p @config_local
-                p @config_remote
-                gets
-
-                if @config_local[:version] > @config_local[:remote] # && !force
-                  @logger.warn "WARNING, version on server is OLDER, aborting!"
-                  raise RsyncExecuteError
+              puts "Dildo"
+              #  begin
+              # TODO: Change to fetch .repository.yml instead
+              begin
+                fetch_file(".pack/.repository.yml", host)
+              rescue
+              end
+              if FileTest.exists? File.join(@rsync_work_dir, ".pack/.repository.yml")
+                [File.join(@rsync_work_dir, '.pack/.version'), File.join(@rsync_work_dir, '.pack/.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
+                  FileUtils.rm_f f  if FileTest.exists? f
                 end
+              else
+                fetch_file(".pack/.version", host)
+                fetch_file(".sums.yml", host)
                 fetch_file(File.join(".pack", ".sums.yml"), host)
-                done = true
-             # rescue
-             #   @logger.debug "Failed #{host}, trying next.."
-             # end
+              end
+
+              load_config(:remote)
+              load_config(:local)
+              p @config_local
+              p @config_remote
+
+              if @config_local[:version] > @config_remote[:version] # && !force
+                @logger.warn "WARNING, version on server is OLDER, aborting!"
+                raise RsyncExecuteError
+              end
+              done = true
+              # rescue
+              #   @logger.debug "Failed #{host}, trying next.."
+              # end
             end
           end
           if done
             # TODO: Don't do actions when not online
             compare_set(:pack, host)
-
-            ## Working Directory
-            fetch_file('.sums.yml', host) if online
             compare_set(:wd, host)
-
             save_config
           end
         end
