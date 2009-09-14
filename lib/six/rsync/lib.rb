@@ -242,13 +242,12 @@ module Six
           if change
             @config_local[:pack] = @config_remote[:pack].clone
             @config_local[:wd] = @config_remote[:wd].clone
-            save_config
 
             cmd = ''
 
             # TODO: Change to repositories.yml
             host = config[:hosts].sample
-            verfile_srv = File.join(".pack", ".version")
+            verfile_srv = File.join(".pack", ".repository.yml")
             begin
               fetch_file(verfile_srv, host)
             rescue
@@ -256,17 +255,17 @@ module Six
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
               raise RsyncExecuteError
             end
-            ver = read_version
 
-            @config_local[:version] += 1
-            if @config_local[:version] < ver # && !force
+            load_config(:remote)
+            if @config_local[:version] < @config_remote[:version] # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
               raise RsyncExecuteError
             end
+            @config_local[:version] += 1
+            @config_remote[:version] = @config_local[:version]
 
-            @config_remote[:version] = @config_local[:version].clone
-            write_config(:local)
-            write_config(:remote)
+            save_config(:local)
+            save_config(:remote)
 
             arr_opts = []
             arr_opts << PARAMS
@@ -405,15 +404,24 @@ module Six
           h
         end
 
-        def save_config
-          config = @config_local.clone
-          config[:pack] = @config_local[:pack].sort
-          config[:wd] = @config_local[:wd].sort
-          File.open(File.join(@rsync_work_dir, '.rsync', '.repository.yml'), 'w') { |file| file.puts config.to_yaml }
+        def save_config(typ = :local)
+          file, config = nil, nil
+          case typ
+          when :local
+            file = File.join(@rsync_work_dir, '.rsync', '.repository.yml')
+            config = @config_local.clone
+          when :remote
+            file = File.join(@rsync_work_dir, '.rsync', '.pack', '.repository.yml')
+            config = @config_remote.clone
+          end
+          config[:pack] = config[:pack].sort
+          config[:wd] = config[:wd].sort
+          File.open(file, 'w') { |file| file.puts config.to_yaml }
+
+          # TODO: Remove cleanup
           [File.join(@rsync_work_dir, '.rsync/.version'), File.join(@rsync_work_dir, '.rsync/sums_pack.yml'), File.join(@rsync_work_dir, '.rsync/sums_wd.yml')].each do |f|
             FileUtils.rm_f f  if FileTest.exists? f
           end
-
         end
 
         def load_config(typ)
@@ -558,15 +566,6 @@ module Six
             compare_set(:pack, host)
             compare_set(:wd, host)
             save_config
-          end
-        end
-
-        def read_version
-          verfile = File.join(@rsync_work_dir, '.rsync', '.pack', '.version')
-          if FileTest.exist?(verfile)
-            File.open(verfile) {|file| file.read.to_i }
-          else
-            0
           end
         end
 
