@@ -672,6 +672,7 @@ module Six
 
           #@logger.debug(out)
 
+          # FIXME: This doesn't work with the new popen or is there a way?
           if $?.exitstatus > 0
             if $?.exitstatus == 1 && out == ''
               return ''
@@ -700,6 +701,7 @@ module Six
             `#{rsync_cmd}`.chomp
           end
 =end
+          io
         end
 
         def process_msg(msg)
