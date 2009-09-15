@@ -659,6 +659,10 @@ module Six
             #end
           end
 
+          if @logger
+            @logger.debug(rsync_cmd)
+          end
+
           out = nil
           if chdir && (Dir.getwd != path)
             Dir.chdir(path) { out = run_command(rsync_cmd, &block) }
@@ -666,10 +670,7 @@ module Six
             out = run_command(rsync_cmd, &block)
           end
 
-          if @logger
-            @logger.debug(rsync_cmd)
-            @logger.debug(out)
-          end
+          #@logger.debug(out)
 
           if $?.exitstatus > 0
             if $?.exitstatus == 1 && out == ''
@@ -683,14 +684,15 @@ module Six
         def run_command(rsync_cmd, &block)
           # TODO: Make this switchable? Verbosity ?
           # Or actually parse this live for own stats?
-           io = popen(rsync_cmd)
-           #io.write("ping localhost\nexit\n")
-           msg = ""
-           while !(buffer = io.read).empty?
-             msg << buffer
-             print buffer#.gsub("\r", '')
-           end
-           msg
+          io = popen(rsync_cmd)
+          #io.write("ping localhost\nexit\n")
+          msg = []
+          @previous = nil
+          @write = true
+          while !(buffer = io.read).empty?
+            msg << process_msg(buffer)
+          end
+          msg.join("\n")
 =begin
           if block_given?
             IO.popen(rsync_cmd, &block)
@@ -698,6 +700,31 @@ module Six
             `#{rsync_cmd}`.chomp
           end
 =end
+        end
+
+        def process_msg(msg)
+          m = nil
+          if msg[/\r/]
+            # TODO; must still be written even if there is no next message :P
+
+            if @write
+              print msg
+            end
+            m = msg.gsub("\r", '')
+            #@previous = m
+          else
+            m = msg
+            #if @previous
+            #  @logger.debug @previous
+            #  @previous = nil
+            #end
+            #unless @previous
+            #  @logger.debug m
+            #end
+            @logger.debug m
+            puts m if @write
+          end
+          m
         end
       end
     end
