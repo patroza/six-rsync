@@ -22,7 +22,7 @@ module Six
             :repository => File.join(working_dir, '.rsync')
           }.merge(opts)
 
-          FileUtils.mkdir_p(opts[:working_directory]) if opts[:working_directory] && !File.directory?(opts[:working_directory])
+          #FileUtils.mkdir_p(opts[:working_directory]) if opts[:working_directory] && !File.directory?(opts[:working_directory])
 
           # run rsync_init there
           logger = if opts[:log]
@@ -87,6 +87,10 @@ module Six
 
         def commit
           lib.commit
+        end
+
+        def push
+          lib.push
         end
 
         # returns a reference to the working directory

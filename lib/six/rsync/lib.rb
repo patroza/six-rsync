@@ -60,6 +60,8 @@ module Six
           end
           FileUtils.mkdir_p pack_path
           save_config(config)
+          save_repos(:local)
+          save_repos(:remote)
         end
 
         def clone(repository, name, opts = {})
@@ -252,6 +254,7 @@ module Six
 
           if change
             cmd = ''
+            save_repos(:local)
 
             # TODO: Change to repositories.yml
             host = config[:hosts].sample
@@ -261,7 +264,7 @@ module Six
             rescue
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
-              raise RsyncExecuteError
+              # raise RsyncExecuteError
             end
             load_repos(:remote)
             if @repos_local[:version] < @repos_remote[:version] # && !force
@@ -274,24 +277,23 @@ module Six
             @repos_remote[:wd] = @repos_local[:wd].clone
             save_repos(:remote)
             save_repos(:local)
-
-            # TODO: UNCLUSTERFUCK
-            arr_opts = []
-            arr_opts << PARAMS
-
-            # Upload .pack changes
-            if host[/\A(\w)*\@/]
-              arr_opts << "-e ssh"
-            end
-            arr_opts << esc(pack_path('.'))
-            arr_opts << esc(File.join(host, '.pack'))
-
-            command(cmd, arr_opts)
-
-            # TODO: UNCLUSTERFUCK
-            arr_opts = []
-            arr_opts << PARAMS
+            push(host)
           end
+        end
+
+        def push(host = config[:hosts].sample)
+          # TODO: UNCLUSTERFUCK
+          arr_opts = []
+          arr_opts << PARAMS
+
+          # Upload .pack changes
+          if host[/\A(\w)*\@/]
+            arr_opts << "-e ssh"
+          end
+          arr_opts << esc(pack_path('.'))
+          arr_opts << esc(File.join(host, '.pack'))
+
+          command(cmd, arr_opts)
         end
 
         def compare_set(typ, host, online = true)
