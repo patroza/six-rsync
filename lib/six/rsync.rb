@@ -6,6 +6,7 @@ require 'six/rsync/repository'
 require 'six/rsync/working_directory'
 require 'six/rsync/lib'
 require 'six/rsync/base'
+require 'six/popen'
 
 if RUBY_VERSION == "1.8.7"
   class Array

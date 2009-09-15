@@ -281,7 +281,9 @@ module Six
           end
         end
 
-        def push(host = config[:hosts].sample)
+        def push(host = nil)
+          @config = load_config
+          host = config[:hosts].sample unless host
           # TODO: UNCLUSTERFUCK
           arr_opts = []
           arr_opts << PARAMS
@@ -293,7 +295,7 @@ module Six
           arr_opts << esc(pack_path('.'))
           arr_opts << esc(File.join(host, '.pack'))
 
-          command(cmd, arr_opts)
+          command('', arr_opts)
         end
 
         def compare_set(typ, host, online = true)
@@ -679,11 +681,23 @@ module Six
         end
 
         def run_command(rsync_cmd, &block)
+          # TODO: Make this switchable? Verbosity ?
+          # Or actually parse this live for own stats?
+           io = popen(rsync_cmd)
+           #io.write("ping localhost\nexit\n")
+           msg = ""
+           while !(buffer = io.read).empty?
+             msg << buffer
+             print buffer#.gsub("\r", '')
+           end
+           msg
+=begin
           if block_given?
             IO.popen(rsync_cmd, &block)
           else
             `#{rsync_cmd}`.chomp
           end
+=end
         end
       end
     end
