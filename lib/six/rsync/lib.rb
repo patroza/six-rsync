@@ -1,3 +1,5 @@
+# encoding: UTF-8
+
 # TODO: Add Rsync add, commit and push (Update should be pull?), either with staging like area like Git, or add is pack into .pack, and commit is update sum ?
 # TODO: Seperate command lib from custom layer over rsync?
 
@@ -15,15 +17,16 @@ module Six
         WINDRIVE = /\"(\w)\:/
         DEFAULT_CONFIG = {:hosts => []}.to_yaml
         PARAMS = if PROTECTED
-          "--dry-run --times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+          "--dry-run --times -O --no-whole-file -r --delete --progress --exclude=.rsync"
         else
-          "--times -O --no-whole-file -r --delete --stats --progress --exclude=.rsync"
+          "--times -O --no-whole-file -r --delete --progress --exclude=.rsync"
         end
 
         def initialize(base = nil, logger = nil)
           @rsync_dir = nil
           @rsync_work_dir = nil
           @path = nil
+          @stats = false
 
           @repos_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
           @repos_remote = {:pack => Hash.new, :wd => Hash.new, :version => 0}
@@ -647,6 +650,8 @@ module Six
         def command(cmd, opts = [], chdir = true, redirect = '', &block)
           path = @rsync_work_dir || @rsync_dir || @path
 
+          opts << "--stats" if @stats
+
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
 
@@ -672,36 +677,47 @@ module Six
 
           #@logger.debug(out)
 
-          # FIXME: This doesn't work with the new popen or is there a way?
-          if $?.exitstatus > 0
-            if $?.exitstatus == 1 && out == ''
-              return ''
-            end
-            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
-          end
           out
+        end
+
+        def bla(msg)
+          if msg[/kB\/s/]
+            print "#{msg.gsub("\n", '')}\r"
+          else
+            print msg
+          end
         end
 
         def run_command(rsync_cmd, &block)
           # TODO: Make this switchable? Verbosity ?
           # Or actually parse this live for own stats?
-          io = popen(rsync_cmd)
-          #io.write("ping localhost\nexit\n")
-          msg = []
-          @previous = nil
-          @write = true
-          while !(buffer = io.read).empty?
-            msg << process_msg(buffer)
+          puts rsync_cmd
+          s = nil
+          out = ''
+          # $stdout.sync = true #???
+          status = Open3.popen3(rsync_cmd) { |io_in, io_out, io_err, waitth|
+            while !io_out.eof?
+              buffer = io_out.readline
+              # print buf#.gsub("\r", '')
+              bla buffer
+              out << buffer
+            end
+            error = io_err.gets
+            if error
+              puts "Error: " + error.chomp
+              #     exit
+            end
+            #   puts "Result: " + io_out.gets
+            s = waitth.value
+          }
+          # FIXME: This doesn't work with the new popen or is there a way?
+          if s.exitstatus > 0
+            if s.exitstatus == 1 && out == ''
+              return ''
+            end
+            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
           end
-          msg.join("\n")
-=begin
-          if block_given?
-            IO.popen(rsync_cmd, &block)
-          else
-            `#{rsync_cmd}`.chomp
-          end
-=end
-          io
+          status
         end
 
         def process_msg(msg)

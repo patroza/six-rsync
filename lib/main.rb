@@ -1,3 +1,5 @@
+# encoding: UTF-8
+
 =begin
         # Nasty workaround for cygwin on Vista vs XP, vs acl's
         @config[:app_path][/\A(\w\:)/]
@@ -80,10 +82,9 @@ repositories = %w[
   six_sap_clutter
   six_vop_sound
 ]
-#repositories = %w[
-#  cba
-#  six
-#]
+repositories = %w[
+  arma2beta
+]
 
 repositories.each do |r|
   urls = []
@@ -91,16 +92,18 @@ repositories.each do |r|
     urls << File.join(host, r, '/.')
   end
 
-  begin
-    Rsync.clone(urls, r, :path => dir, :log => log)
-  rescue
-  end
+  #begin
+  #  Rsync.clone(urls, r, :path => dir, :log => log)
+  #rescue
+  #end
+  #rs = Rsync.init(File.join(dir, r), :log => log)
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!
   #rs.commit
+  rs.push
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
-  rs.update
+  #rs.update
 end
 
 module Six

@@ -1,12 +1,18 @@
+# encoding: UTF-8
+
 require 'fileutils'
 require 'digest/md5'
+require 'yaml'
 
 require 'six/rsync/path'
 require 'six/rsync/repository'
 require 'six/rsync/working_directory'
 require 'six/rsync/lib'
 require 'six/rsync/base'
-require 'six/popen'
+#require 'six/popen'
+
+require 'open3'
+#require 'win32/open3'
 
 if RUBY_VERSION == "1.8.7"
   class Array
