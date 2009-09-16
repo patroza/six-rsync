@@ -17,9 +17,9 @@ module Six
         WINDRIVE = /\"(\w)\:/
         DEFAULT_CONFIG = {:hosts => []}.to_yaml
         PARAMS = if PROTECTED
-          "--dry-run --times -O --no-whole-file -r --delete --progress --exclude=.rsync"
+          "--dry-run --times -O --no-whole-file -r --delete --progress -h --exclude=.rsync"
         else
-          "--times -O --no-whole-file -r --delete --progress --exclude=.rsync"
+          "--times -O --no-whole-file -r --delete --progress -h --exclude=.rsync"
         end
 
         def initialize(base = nil, logger = nil)
@@ -680,18 +680,10 @@ module Six
           out
         end
 
-        def bla(msg)
-          if msg[/kB\/s/]
-            print "#{msg.gsub("\n", '')}\r"
-          else
-            print msg
-          end
-        end
-
         def run_command(rsync_cmd, &block)
           # TODO: Make this switchable? Verbosity ?
           # Or actually parse this live for own stats?
-          puts rsync_cmd
+          #puts rsync_cmd
           s = nil
           out = ''
           # $stdout.sync = true #???
@@ -699,7 +691,7 @@ module Six
             while !io_out.eof?
               buffer = io_out.readline
               # print buf#.gsub("\r", '')
-              bla buffer
+              process_msg buffer
               out << buffer
             end
             error = io_err.gets
@@ -721,6 +713,16 @@ module Six
         end
 
         def process_msg(msg)
+          if msg[/kB\/s/]
+            msg.gsub!("\n", '')
+            print "#{msg}\r"
+          else
+            @logger.debug msg
+            print msg
+          end
+          msg
+
+=begin
           m = nil
           if msg[/\r/]
             # TODO; must still be written even if there is no next message :P
@@ -743,6 +745,7 @@ module Six
             puts m if @write
           end
           m
+=end
         end
       end
     end
