@@ -83,6 +83,7 @@ module Six
         Base.clone(repository, name, options)
       end
 
+=begin
       # Export the current HEAD (or a branch, if <tt>options[:branch]</tt>
       # is specified) into the +name+ directory, then remove all traces of rsync from the
       # directory.
@@ -138,7 +139,7 @@ module Six
       def global_config(name = nil, value = nil)
         self.class.global_config(name, value)
       end
-
+=end
     end
   end
 end

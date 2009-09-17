@@ -116,6 +116,7 @@ module Six
 
           #unpack
 
+          # FIXME: This does not work when not forced, as host is sampled in comparesums :)
           host = config[:hosts].sample
           @logger.info "Trying: #{host}, please wait..."
 
@@ -159,6 +160,7 @@ module Six
           @logger.info "Adding #{file}"
           if (file == ".")
             load_repos(:remote)
+            @logger.info "Calculating Checksums..."
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
             change = false
@@ -206,6 +208,8 @@ module Six
 
           load_repos(:local)
           load_repos(:remote)
+
+          @logger.info "Calculating Checksums..."
           # Added or Changed files
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
@@ -285,6 +289,7 @@ module Six
         end
 
         def push(host = nil)
+          @logger.info "Pushing..."
           @config = load_config
           host = config[:hosts].sample unless host
           # TODO: UNCLUSTERFUCK
@@ -408,7 +413,9 @@ module Six
           end
           if done
             # TODO: Don't do actions when not online
+            @logger.info "Calculating Checksums of Packed files..."
             compare_set(:pack, host)
+            @logger.info "Calculating Checksums of Unpacked files..."
             compare_set(:wd, host)
             save_repos
           end
@@ -557,17 +564,6 @@ module Six
           end
         end
 
-        def load_sums(file, key)
-          sum = Hash.new
-          File.open(File.join(@rsync_work_dir, file)) do |file|
-            h = Hash.new
-            YAML::load(file).each { |e| h[e[0]] = e[1] }
-            sum[:list] = h
-            sum[:md5] = md5(file.path)
-          end
-          sum
-        end
-
         def del_file(file, typ, opts = {})
           file = case typ
           when :pack
@@ -591,7 +587,7 @@ module Six
         end
 
         def zip7(file)
-          out = %x[7za x #{esc(file)} -y]
+          out = %x[7z x #{esc(file)} -y]
           @logger.debug out
           out
         end
