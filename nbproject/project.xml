@@ -5,6 +5,7 @@
         <data xmlns="http://www.netbeans.org/ns/ruby-project/1">
             <name>six-rsync</name>
             <source-roots>
+                <root id="src.build.dir"/>
                 <root id="src.dir"/>
             </source-roots>
             <test-roots>

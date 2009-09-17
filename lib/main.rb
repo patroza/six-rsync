@@ -99,8 +99,8 @@ repositories.each do |r|
   #rs = Rsync.init(File.join(dir, r), :log => log)
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!
-  #rs.commit
-  rs.push
+  rs.commit
+  #rs.push
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
   #rs.update
