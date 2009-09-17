@@ -13,6 +13,7 @@ module Six
       end
 
       class Lib
+        attr_accessor :verbose
         PROTECTED = false
         WINDRIVE = /\"(\w)\:/
         DEFAULT_CONFIG = {:hosts => []}.to_yaml
@@ -27,6 +28,7 @@ module Six
           @rsync_work_dir = nil
           @path = nil
           @stats = false
+          @verbose = true
 
           @repos_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
           @repos_remote = {:pack => Hash.new, :wd => Hash.new, :version => 0}
@@ -102,7 +104,7 @@ module Six
         end
 
         def update(cmd, x_opts = [], opts = {})
-          @logger.info "Updating: #{@rsync_work_dir}, please wait..."
+          @logger.info "Checking for updates..."
           @config = load_config
           unless @config
             @logger.error "Not an Rsync repository!"
@@ -138,7 +140,7 @@ module Six
             save_repos
 
             # fetch latest sums and only update when changed
-            compare_sums
+            compare_sums(true, host)
           end          
         end
 
@@ -237,6 +239,8 @@ module Six
           end
 
           # Deleted files
+          @logger.info "Checking for deleted files..."
+
           ar2 = Dir[File.join(@rsync_work_dir, '/.rsync/.pack/**/*')]
           i = 0
           ar2.each do |file|
@@ -260,6 +264,7 @@ module Six
           end
 
           if change
+            @logger.info "Changes found!"
             cmd = ''
             save_repos(:local)
 
@@ -267,7 +272,10 @@ module Six
             host = config[:hosts].sample
             verfile_srv = File.join(".pack", ".repository.yml")
             begin
+              verbose = @verbose.clone
+              @verbose = false
               fetch_file(verfile_srv, host)
+              @verbose = verbose
             rescue
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
@@ -285,6 +293,8 @@ module Six
             save_repos(:remote)
             save_repos(:local)
             push(host)
+          else
+            @logger.info "No changes found!"
           end
         end
 
@@ -376,20 +386,26 @@ module Six
           save_repos
         end
 
-        def compare_sums(online = true)
+        def compare_sums(online = true, host = config[:hosts].sample)
           hosts = config[:hosts].clone
-          host = hosts.sample
-          done = true
+          done = false
 
           ## Pack
           if online
-            done = false
+            b = false
             while hosts.size > 0 && !done do
-              host = hosts.sample
+              # FIXME: Nasty
+              if b
+                host = hosts.sample
+              end
+              b = true
               hosts -= [host]
 
               begin
+                verbose = @verbose.clone
+                @verbose = false
                 fetch_file(".pack/.repository.yml", host)
+                @verbose = verbose
 
                 # TODO: CLEANUP, Should depricate in time.
                 if FileTest.exists? pack_path('.repository.yml')
@@ -411,11 +427,11 @@ module Six
               end
             end
           end
-          if done
+          if done || online
             # TODO: Don't do actions when not online
-            @logger.info "Calculating Checksums of Packed files..."
+            @logger.info "Verifying Packed files..."
             compare_set(:pack, host)
-            @logger.info "Calculating Checksums of Unpacked files..."
+            @logger.info "Verifying Unpacked files..."
             compare_set(:wd, host)
             save_repos
           end
@@ -469,6 +485,7 @@ module Six
         end
 
         def calc_sums(typ)
+          @logger.debug "Calculating checksums of #{typ} files"
           ar = []
           reg = case typ
           when :pack
@@ -709,12 +726,12 @@ module Six
         end
 
         def process_msg(msg)
-          if msg[/kB\/s/]
+          if msg[/[k|m|g]?B\/s/i]
             msg.gsub!("\n", '')
-            print "#{msg}\r"
+            print "#{msg}\r" if @verbose
           else
             @logger.debug msg
-            print msg
+            print msg if @verbose
           end
           msg
 
