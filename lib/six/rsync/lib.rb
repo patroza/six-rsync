@@ -8,8 +8,12 @@ module Six
     module Rsync
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
+      REGEX_FOLDER = /(.*)[\\|\/](.*)/
 
       class RsyncExecuteError < StandardError
+      end
+
+      class RsyncError < StandardError
       end
 
       class Lib
@@ -57,11 +61,11 @@ module Six
           @logger.info "Processing: #{rsync_path}"
           if FileTest.exist? rsync_path
             @logger.error "Seems to already be an Rsync repository, Aborting!"
-            raise RsyncExecuteError
+            raise RsyncError
           end
           if FileTest.exist? @rsync_work_dir
             @logger.error "Seems to already be a folder, Aborting!"
-            raise RsyncExecuteError
+            raise RsyncError
           end
           FileUtils.mkdir_p pack_path
           save_config(config)
@@ -91,12 +95,14 @@ module Six
             arr_opts << "-I" if opts[:force]
             begin
               update('', arr_opts)
-            rescue
+            rescue RsyncError
               @logger.error "Unable to sucessfully update, aborting..."
               # Dangerous? :D
-              FileUtils.rm_rf @rsync_work_dir
+              FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
+              #rescue
+              #  FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             end
-          rescue
+          rescue RsyncError
             @logger.error "Unable to initialize"
           end
 
@@ -108,12 +114,12 @@ module Six
           @config = load_config
           unless @config
             @logger.error "Not an Rsync repository!"
-            raise RsyncExecuteError
+            raise RsyncError
           end
 
           unless config[:hosts].size > 0
             @logger.error "No hosts configured!"
-            raise RsyncExecuteError
+            raise RsyncError
           end
 
           #unpack
@@ -212,10 +218,29 @@ module Six
           load_repos(:remote)
 
           @logger.info "Calculating Checksums..."
+          @repos_local[:wd] = calc_sums(:wd)
           # Added or Changed files
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
+
           change = false
+          i = 0
+          @repos_local[:wd].each_pair do |key, value|
+            i += 1
+            if value != @repos_remote[:wd][key]
+              change = true
+              @logger.info "Packing #{i}/#{@repos_local[:wd].size}: #{key}"
+              file = File.join(@rsync_work_dir, key)
+              file[REGEX_FOLDER]
+              folder = $2
+              gzip(file)
+              @repos_local[:pack]["#{key}.gz"] = md5("#{file}.gz")
+              FileUtils.mkdir_p pack_path(folder) if folder
+              FileUtils.mv("#{file}.gz", pack_path("#{key}.gz"))
+            end
+          end
+
+=begin
           i = 0
           ar.each do |file|
             i += 1
@@ -223,24 +248,42 @@ module Six
               relative = file.clone
               relative.gsub!(@rsync_work_dir, '')
               relative.gsub!(/\A[\\|\/]/, '')
-              checksum = md5(file)
-              if checksum != @repos_remote[:wd][relative]
+              #checksum = md5(file)
+              if @repos_local[:wd][relative] != @repos_remote[:wd][relative]
                 relative[/(.*)\/(.*)/]
                 folder = $1
                 change = true
                 @logger.info "Packing #{i}/#{ar.size}: #{relative}"
                 gzip(file)
-                @repos_local[:wd][relative] = checksum
+                #@repos_local[:wd][relative] = checksum
                 @repos_local[:pack]["#{relative}.gz"] = md5("#{file}.gz")
                 FileUtils.mkdir_p pack_path(folder) if folder
                 FileUtils.mv("#{file}.gz", pack_path("#{relative}.gz"))
               end
             end
           end
-
+=end
           # Deleted files
           @logger.info "Checking for deleted files..."
 
+          @repos_remote[:wd].each_pair do |key, value|
+            i += 1
+            if @repos_local[:wd][key].nil?
+              packed = "#{key}.gz"
+              change = true
+              file = pack_path(packed)
+              file[REGEX_FOLDER]
+              folder = $2
+
+              @logger.info "Removing #{i}/#{@repos_remote[:wd].size}: #{packed}"
+              @repos_local[:wd].delete key
+              @repos_local[:pack].delete packed              
+              FileUtils.rm_f(file) if File.exists?(file)
+            end
+          end
+
+=begin
+          p @repos_local[:wd]
           ar2 = Dir[File.join(@rsync_work_dir, '/.rsync/.pack/**/*')]
           i = 0
           ar2.each do |file|
@@ -251,6 +294,10 @@ module Six
               relative.gsub!(/\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
               local = relative.clone
               local.gsub!(/\.gz\Z/, '')
+              p file
+              p local
+              p @repos_local[:wd][local]
+              puts
               if @repos_local[:wd][local].nil?
                 relative[/(.*)\/(.*)/]
                 folder = $1
@@ -262,7 +309,9 @@ module Six
               end
             end
           end
+=end
 
+          #gets
           if change
             @logger.info "Changes found!"
             cmd = ''
@@ -272,11 +321,12 @@ module Six
             host = config[:hosts].sample
             verfile_srv = File.join(".pack", ".repository.yml")
             begin
-              verbose = @verbose.clone
+              verbose = @verbose
               @verbose = false
               fetch_file(verfile_srv, host)
               @verbose = verbose
             rescue
+              @verbose = verbose
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
               # raise RsyncExecuteError
@@ -284,7 +334,7 @@ module Six
             load_repos(:remote)
             if @repos_local[:version] < @repos_remote[:version] # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
-              raise RsyncExecuteError
+              raise RsyncError
             end
             @repos_local[:version] += 1
             @repos_remote[:version] = @repos_local[:version]
@@ -402,28 +452,27 @@ module Six
               hosts -= [host]
 
               begin
-                verbose = @verbose.clone
+                verbose = @verbose
                 @verbose = false
                 fetch_file(".pack/.repository.yml", host)
                 @verbose = verbose
-
-                # TODO: CLEANUP, Should depricate in time.
-                if FileTest.exists? pack_path('.repository.yml')
-                  [pack_path('.version'), pack_path('.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
-                    FileUtils.rm_f f if FileTest.exists? f
-                  end
-                end
 
                 load_repos(:remote)
                 load_repos(:local)
 
                 if @repos_local[:version] > @repos_remote[:version] # && !force
                   @logger.warn "WARNING, version on server is OLDER, aborting!"
-                  raise RsyncExecuteError
+                  raise RsyncError
                 end
                 done = true
               rescue
-                @logger.debug "Failed #{host}, trying next.."
+                @logger.info "Failed #{host}, trying next.."
+              end
+            end
+            # TODO: CLEANUP, Should depricate in time.
+            if FileTest.exists? pack_path('.repository.yml')
+              [pack_path('.version'), pack_path('.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
+                FileUtils.rm_f f if FileTest.exists? f
               end
             end
           end
@@ -699,14 +748,32 @@ module Six
           #puts rsync_cmd
           s = nil
           out = ''
-          # $stdout.sync = true #???
+          $stdout.sync = true # Seems to fix C:/Packaging/six-updater/NEW - Copy/ruby/lib/ruby/gems/1.9.1/gems/log4r-1.0.5/lib/log4r/outputter/iooutputter.rb:43:in `flush': Broken pipe (Errno::EPIPE)
+
+          # Simpler method but on windows the !? exitstatus is not working properly..
+          # Does nicely display error output in logwindow though
+          io = IO.popen(rsync_cmd)
+          io.sync = true
+          io.each do |buffer|
+            process_msg buffer
+            out << buffer
+          end
+=begin
           status = Open3.popen3(rsync_cmd) { |io_in, io_out, io_err, waitth|
-            while !io_out.eof?
-              buffer = io_out.readline
-              # print buf#.gsub("\r", '')
+            io_out.sync = true
+            io_err.sync = true
+
+            io_out.each do |buffer|
               process_msg buffer
               out << buffer
             end
+
+            #while !io_out.eof?
+            #  buffer = io_out.readline
+            #  # print buf#.gsub("\r", '')
+            #  process_msg buffer
+            #  out << buffer
+            #end
             error = io_err.gets
             if error
               puts "Error: " + error.chomp
@@ -723,6 +790,7 @@ module Six
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
           end
           status
+=end
         end
 
         def process_msg(msg)

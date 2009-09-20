@@ -17,7 +17,11 @@ COMPONENT = 'six-rsync'
 
 # Create loggers
 log = Log4r::Logger.new(COMPONENT)
-format1 = Log4r::PatternFormatter.new(:pattern => "[%l] %d: %m", :date_pattern => '%H:%M:%S')
+if defined?(DEBUG)
+  format1 = Log4r::PatternFormatter.new(:pattern => "[%l] %d: %m", :date_pattern => '%H:%M:%S')
+else
+  format1 = Log4r::PatternFormatter.new(:pattern => "%m")
+end
 format2 = Log4r::PatternFormatter.new(:pattern => "[%l] %c %d: %m", :date_pattern => '%H:%M:%S')
 
 if not defined?(Ocra)
@@ -84,6 +88,7 @@ repositories = %w[
 ]
 repositories = %w[
   arma2beta
+  panthera
 ]
 
 repositories.each do |r|
