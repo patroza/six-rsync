@@ -87,9 +87,12 @@ repositories = %w[
   six_vop_sound
 ]
 repositories = %w[
-  arma2beta
+  beta
   panthera
 ]
+#   arma2beta
+
+repositories = ["six_vop_sound"]
 
 repositories.each do |r|
   urls = []

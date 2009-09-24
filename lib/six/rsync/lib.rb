@@ -20,7 +20,7 @@ module Six
         attr_accessor :verbose
         PROTECTED = false
         WINDRIVE = /\"(\w)\:/
-        DEFAULT_CONFIG = {:hosts => []}.to_yaml
+        DEFAULT_CONFIG = {:hosts => [], :exclude => []}.to_yaml
         PARAMS = if PROTECTED
           "--dry-run --times -O --no-whole-file -r --delete --progress -h --exclude=.rsync"
         else
@@ -427,7 +427,7 @@ module Six
           @repos_local[typ].each_pair do |key, value|
             if @repos_remote[typ][key].nil?
               @logger.info "File does not exist in remote! #{key}"
-              del << key
+              del << key unless config[:exclude].include?(key)
             end
           end
           del.each { |e| del_file(e, typ) }
@@ -488,7 +488,10 @@ module Six
 
         private
         def config
-          @config ||= YAML::load(DEFAULT_CONFIG)
+          cfg = @config ||= YAML::load(DEFAULT_CONFIG)
+          cfg[:exclude] = [] unless cfg[:exclude]
+          cfg[:hosts] = [] unless cfg[:hosts]
+          cfg
         end
 
         def rsync_path(path = '')
@@ -551,7 +554,7 @@ module Six
             relative.gsub!(reg, '')
 
             sum = md5(file)
-            h[relative] = sum if sum
+            h[relative] = sum if sum && !config[:exclude].include?(relative)
           end
           h
         end
