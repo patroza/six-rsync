@@ -4,6 +4,7 @@ require 'fileutils'
 require 'digest/md5'
 require 'yaml'
 
+BASE_PATH = Dir.pwd
 require 'six/rsync/path'
 require 'six/rsync/repository'
 require 'six/rsync/working_directory'
@@ -29,7 +30,6 @@ module Six
 
     module Rsync
       VERSION = '0.1.1'
-      BASE_PATH = Dir.pwd
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
       ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')}"

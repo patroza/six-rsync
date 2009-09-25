@@ -6,6 +6,9 @@
 module Six
   module Repositories
     module Rsync
+      # TODO: Configure somewhere!
+      KEY = "C:/users/sb/documents/keys/id_rsa.ppk"
+      RSH = "-r --rsh=\"'#{File.join(BASE_PATH, "tools", "cygnative.exe")}' plink.exe -i #{KEY}\""
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
       REGEX_FOLDER = /(.*)[\\|\/](.*)/
@@ -132,6 +135,9 @@ module Six
             arr_opts = []
             arr_opts << PARAMS
             arr_opts += x_opts
+            if host[/\A(\w)*\@/]
+              arr_opts << RSH#"-e ssh"
+            end
 
             # TODO: UNCLUSTERFUCK
             arr_opts << esc(File.join(host, '.pack/.'))
@@ -318,8 +324,8 @@ module Six
             cmd = ''
             save_repos(:local)
 
-            # TODO: Change to repositories.yml
             host = config[:hosts].sample
+
             verfile_srv = File.join(".pack", ".repository.yml")
             begin
               verbose = @verbose
@@ -359,7 +365,7 @@ module Six
 
           # Upload .pack changes
           if host[/\A(\w)*\@/]
-            arr_opts << "-e ssh"
+            arr_opts << RSH
           end
           arr_opts << esc(pack_path('.'))
           arr_opts << esc(File.join(host, '.pack'))
@@ -397,6 +403,10 @@ module Six
                   @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                   arr_opts = []
                   arr_opts << PARAMS
+                  if host[/\A(\w)*\@/]
+                    arr_opts << RSH
+                  end
+
                   arr_opts << File.join(host, '.pack/.')
                   arr_opts << esc(pack_path)
 
@@ -524,7 +534,7 @@ module Six
           arr_opts = []
           arr_opts << PARAMS
           if host[/\A(\w)*\@/]
-            arr_opts << "-e ssh"
+            arr_opts << RSH
           end
           arr_opts << esc(File.join(host, path))
           arr_opts << esc(rsync_path(folder))
@@ -779,7 +789,7 @@ module Six
             #end
             error = io_err.gets
             if error
-              puts "Error: " + error.chomp
+              @logger.debug "Error: " + error.chomp
               #     exit
             end
             #   puts "Result: " + io_out.gets
