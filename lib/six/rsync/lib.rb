@@ -232,7 +232,7 @@ module Six
               @logger.info "Packing #{i}/#{@repos_local[:wd].size}: #{key}"
               file = File.join(@rsync_work_dir, key)
               file[REGEX_FOLDER]
-              folder = $2
+              folder = $1
               gzip(file)
               @repos_local[:pack]["#{key}.gz"] = md5("#{file}.gz")
               FileUtils.mkdir_p pack_path(folder) if folder
