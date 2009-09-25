@@ -673,7 +673,7 @@ module Six
         end
 
         def gzip(file)
-          @logger.info "Packing #{file}"
+          @logger.debug "Gzipping #{file}"
           out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
           @logger.debug out
         end
