@@ -110,7 +110,7 @@ module Six
         end
 
         def update(cmd, x_opts = [], opts = {})
-          @logger.info "Checking for updates..."
+          @logger.debug "Checking for updates..."
           @config = load_config
           unless @config
             @logger.error "Not an Rsync repository!"
@@ -126,9 +126,9 @@ module Six
 
           # FIXME: This does not work when not forced, as host is sampled in comparesums :)
           host = config[:hosts].sample
-          @logger.info "Trying: #{host}, please wait..."
 
           if opts[:force]
+            @logger.info "Trying: #{host}, please wait..."
             arr_opts = []
             arr_opts << PARAMS
             arr_opts += x_opts
@@ -233,6 +233,7 @@ module Six
               file = File.join(@rsync_work_dir, key)
               file[REGEX_FOLDER]
               folder = $1
+              folder.gsub!(@rsync_work_dir, '')
               gzip(file)
               @repos_local[:pack]["#{key}.gz"] = md5("#{file}.gz")
               FileUtils.mkdir_p pack_path(folder) if folder
@@ -445,11 +446,10 @@ module Six
             b = false
             while hosts.size > 0 && !done do
               # FIXME: Nasty
-              if b
-                host = hosts.sample
-              end
+              host = hosts.sample if b
               b = true
               hosts -= [host]
+              @logger.info "Trying #{host}"
 
               begin
                 verbose = @verbose
@@ -466,7 +466,7 @@ module Six
                 end
                 done = true
               rescue
-                @logger.info "Failed #{host}, trying next.."
+                @logger.info "Failed!"
               end
             end
             # TODO: CLEANUP, Should depricate in time.
@@ -533,6 +533,7 @@ module Six
         end
 
         def calc
+          @logger.info "Calculating checksums"
           [:pack, :wd].each { |t| @repos_local[t] = calc_sums(t) }
         end
 
