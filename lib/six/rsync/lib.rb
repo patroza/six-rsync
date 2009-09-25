@@ -755,13 +755,12 @@ module Six
 
           # Simpler method but on windows the !? exitstatus is not working properly..
           # Does nicely display error output in logwindow though
-          io = IO.popen(rsync_cmd)
-          io.sync = true
-          io.each do |buffer|
-            process_msg buffer
-            out << buffer
-          end
-=begin
+          #io = IO.popen(rsync_cmd)
+          #io.sync = true
+          #io.each do |buffer|
+          #  process_msg buffer
+          #  out << buffer
+          #end
           status = Open3.popen3(rsync_cmd) { |io_in, io_out, io_err, waitth|
             io_out.sync = true
             io_err.sync = true
@@ -793,7 +792,6 @@ module Six
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
           end
           status
-=end
         end
 
         def process_msg(msg)
