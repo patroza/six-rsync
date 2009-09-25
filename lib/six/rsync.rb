@@ -28,7 +28,7 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.0.1'
+      VERSION = '0.1.1'
       BASE_PATH = Dir.pwd
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
