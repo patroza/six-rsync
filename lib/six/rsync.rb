@@ -15,7 +15,8 @@ require 'six/rsync/base'
 require 'open3'
 #require 'win32/open3'
 
-if RUBY_VERSION == "1.8.7"
+case RUBY_VERSION
+when /1\.8\.[0-9]/
   class Array
     def sample
       self[rand self.size]
@@ -29,7 +30,7 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.1.1'
+      VERSION = '0.1.4'
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
       ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')}"
