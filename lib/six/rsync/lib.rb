@@ -100,6 +100,7 @@ module Six
               update('', arr_opts)
             rescue RsyncError
               @logger.error "Unable to sucessfully update, aborting..."
+              @logger.debug "#{$!}"
               # Dangerous? :D
               FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
               #rescue
@@ -107,6 +108,7 @@ module Six
             end
           rescue RsyncError
             @logger.error "Unable to initialize"
+            @logger.debug "#{$!}"
           end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
@@ -336,6 +338,7 @@ module Six
               @verbose = verbose
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
+              @logger.debug "#{$!}"
               # raise RsyncExecuteError
             end
             load_repos(:remote)
@@ -407,7 +410,7 @@ module Six
                     arr_opts << RSH
                   end
 
-                  arr_opts << File.join(host, '.pack/.')
+                  arr_opts << esc(File.join(host, '.pack/.'))
                   arr_opts << esc(pack_path)
 
                   command('', arr_opts)
@@ -477,6 +480,7 @@ module Six
                 done = true
               rescue
                 @logger.info "Failed!"
+                @logger.debug "#{$!}"
               end
             end
             # TODO: CLEANUP, Should depricate in time.
