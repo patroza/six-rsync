@@ -43,7 +43,9 @@ module Six
       def logger
         @@log
       end
-
+      def host
+        @@host
+      end
       class App
         attr_reader :repo
         def logger
@@ -72,8 +74,10 @@ module Six
           app
         end
 
-        def self.clone(host)
-
+        def self.clone(folder)
+          folder[/(.*)[\/|\\](.*)/]
+          pa, folder = $1, $2
+          @repo = Six::Repositories::Rsync.clone(Six::Repositories::Rsync.host, folder, :path => pa, :log => Six::Repositories::Rsync.logger)
         end
 
         def self.init(folder)
@@ -81,7 +85,7 @@ module Six
 #            logger.error "#{folder} already exists!"
 #            Process.exit
 #          end
-          @repo = Six::Repositories::Rsync.init(folder, :log => Six::Repositories::Rsync.logger)
+          Six::Repositories::Rsync.init(folder, :log => Six::Repositories::Rsync.logger)
         end
       end
 

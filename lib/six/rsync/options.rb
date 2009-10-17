@@ -6,6 +6,7 @@ require 'optparse'
 module Six
   module Repositories
     module Rsync
+      @@host = ''
       module_function
       def parse_options
         todo = [] #, general_todo, second_todo = [], [], []
@@ -88,6 +89,7 @@ module Six
       @config = @config.merge(options)
 =end
       end
+
     end
   end
 end
