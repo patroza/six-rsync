@@ -801,7 +801,8 @@ module Six
           }
           # FIXME: This doesn't work with the new popen or is there a way?
           if s.exitstatus > 0
-            if s.exitstatus == 1 && out == ''
+            @logger.debug "Exitstatus: #{s.exitstatus}"
+            if (s.exitstatus == 1 && out.size == 0) || s.exitstatus == 5
               return ''
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
