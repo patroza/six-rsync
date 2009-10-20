@@ -733,7 +733,7 @@ module Six
           opts << "--stats" if @stats
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
-          rsync_cmd = "rsync #{cmd} #{opts} #{redirect}" #  2>&1
+          rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
 
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
