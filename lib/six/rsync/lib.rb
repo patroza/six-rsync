@@ -479,7 +479,6 @@ module Six
                 end
                 done = true
               rescue
-                @logger.info "Failed!"
                 @logger.debug "#{$!}"
               end
             end
