@@ -402,7 +402,7 @@ module Six
               # Update file
               if online
                 # TODO: Progress bar
-                if mismatch.count > (@repos_remote[typ].count / 4)
+                if mismatch.count > (@repos_remote[typ].count / 2)
                   @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
                   arr_opts = []
                   arr_opts << PARAMS
@@ -416,13 +416,29 @@ module Six
                   command('', arr_opts)
                 else
                   c = mismatch.size
-                  i = 0
-                  mismatch.each do |e|
-                    # TODO: Nicer progress bar...
-                    i += 1
-                    @logger.info "Fetching #{i}/#{c}: #{e}"
-                    fetch_file(File.join(".pack", e), host)
+                  @logger.info "Fetching #{mismatch.size} files... Please wait"
+                  slist = File.join(TOOLS_PATH, ".six-updater_#{rand 9999}-list")
+                  File.open(slist, 'w') do |f|
+                    mismatch.each { |e| f.puts e }
                   end
+                  arr_opts = []
+                  arr_opts << PARAMS
+                  
+                  arr_opts << RSH if host[/\A(\w)*\@/]
+
+                  slist = "\"#{slist}\""
+
+                  while slist[WINDRIVE] do
+                    drive = slist[WINDRIVE]
+                    slist.gsub!(drive, "\"/cygdrive/#{$1}")
+                  end
+                  arr_opts << "--files-from=#{slist}"
+
+                  arr_opts << esc(File.join(host, '.pack/.'))
+                  arr_opts << esc(pack_path)
+
+                  command('', arr_opts)
+                  FileUtils.rm_f slist
                 end
               end
             when :wd
