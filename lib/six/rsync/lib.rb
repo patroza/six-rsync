@@ -412,8 +412,11 @@ module Six
 
                   arr_opts << esc(File.join(host, '.pack/.'))
                   arr_opts << esc(pack_path)
-
-                  command('', arr_opts)
+                  begin
+                    command('', arr_opts)
+                  rescue
+                    @logger.warn "There was a problem during updating, please retry!"
+                  end
                 else
                   c = mismatch.size
                   @logger.info "Fetching #{mismatch.size} files... Please wait"
@@ -437,7 +440,11 @@ module Six
                   arr_opts << esc(File.join(host, '.pack/.'))
                   arr_opts << esc(pack_path)
 
-                  command('', arr_opts)
+                  begin
+                    command('', arr_opts)
+                  rescue
+                    @logger.warn "There was a problem during updating, please retry!"
+                  end
                   FileUtils.rm_f slist
                 end
               end
