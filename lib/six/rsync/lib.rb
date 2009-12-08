@@ -842,7 +842,7 @@ module Six
             if (s.exitstatus == 1 && out.size == 0)# || s.exitstatus == 5
               return ''
             end
-            if out.to_s =~ /max connections \((.*))\ reached/
+            if out.to_s =~ /max connections \((.*)\) reached/
               @logger.warn "Server reached maximum connections."
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
