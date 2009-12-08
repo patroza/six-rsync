@@ -87,12 +87,11 @@ repositories = %w[
   six_vop_sound
 ]
 repositories = %w[
-  beta
   panthera
 ]
 #   arma2beta
 
-repositories = ["oac_core"]
+#repositories = ["arma2beta"]
 
 repositories.each do |r|
   urls = []
@@ -107,11 +106,11 @@ repositories.each do |r|
   #rs = Rsync.init(File.join(dir, r), :log => log)
   rs = Rsync.open(File.join(dir, r), :log => log)
   #rs.add('.') # bah!
-  #rs.commit
+  rs.commit
   #rs.push
   #rs = Rsync.open(File.join(dir, "@#{r}test"), :log => log)
   #rs.reset(:hard => true)
-  rs.update
+  #rs.update
 end
 
 module Six

@@ -401,51 +401,66 @@ module Six
               # direct unpack of gz into working folder
               # Update file
               if online
-                # TODO: Progress bar
-                if mismatch.count > (@repos_remote[typ].count / 2)
-                  @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
-                  arr_opts = []
-                  arr_opts << PARAMS
-                  if host[/\A(\w)*\@/]
-                    arr_opts << RSH
-                  end
+                hosts = config[:hosts].clone
+                done = false
 
-                  arr_opts << esc(File.join(host, '.pack/.'))
-                  arr_opts << esc(pack_path)
-                  begin
-                    command('', arr_opts)
-                  rescue
-                    @logger.warn "There was a problem during updating, please retry!"
-                  end
-                else
-                  c = mismatch.size
-                  @logger.info "Fetching #{mismatch.size} files... Please wait"
-                  slist = File.join(TOOLS_PATH, ".six-updater_#{rand 9999}-list")
-                  File.open(slist, 'w') do |f|
-                    mismatch.each { |e| f.puts e }
-                  end
-                  arr_opts = []
-                  arr_opts << PARAMS
+                ## Pack
+                if online
+                  b = false
+                  while hosts.size > 0 && !done do
+                    # FIXME: Nasty
+                    if b
+                      host = hosts.sample
+                      @logger.info "Trying #{host}"
+                    end
+                    b = true
+                    hosts -= [host]
+                    begin
+                      # TODO: Progress bar
+                      if mismatch.count > (@repos_remote[typ].count / 2)
+                        @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
+                        arr_opts = []
+                        arr_opts << PARAMS
+                        if host[/\A(\w)*\@/]
+                          arr_opts << RSH
+                        end
+
+                        arr_opts << esc(File.join(host, '.pack/.'))
+                        arr_opts << esc(pack_path)
+                        command('', arr_opts)
+                      else
+                        c = mismatch.size
+                        @logger.info "Fetching #{mismatch.size} files... Please wait"
+                        slist = File.join(TOOLS_PATH, ".six-updater_#{rand 9999}-list")
+                        File.open(slist, 'w') do |f|
+                          mismatch.each { |e| f.puts e }
+                        end
+                        arr_opts = []
+                        arr_opts << PARAMS
                   
-                  arr_opts << RSH if host[/\A(\w)*\@/]
+                        arr_opts << RSH if host[/\A(\w)*\@/]
 
-                  slist = "\"#{slist}\""
+                        slist = "\"#{slist}\""
 
-                  while slist[WINDRIVE] do
-                    drive = slist[WINDRIVE]
-                    slist.gsub!(drive, "\"/cygdrive/#{$1}")
+                        while slist[WINDRIVE] do
+                          drive = slist[WINDRIVE]
+                          slist.gsub!(drive, "\"/cygdrive/#{$1}")
+                        end
+                        arr_opts << "--files-from=#{slist}"
+
+                        arr_opts << esc(File.join(host, '.pack/.'))
+                        arr_opts << esc(pack_path)
+
+                        command('', arr_opts)
+                        FileUtils.rm_f slist
+                      end
+                      done = true
+                    rescue
+                      @logger.warn "Failure"
+                      @logger.debug "#{$!}"
+                    end
                   end
-                  arr_opts << "--files-from=#{slist}"
-
-                  arr_opts << esc(File.join(host, '.pack/.'))
-                  arr_opts << esc(pack_path)
-
-                  begin
-                    command('', arr_opts)
-                  rescue
-                    @logger.warn "There was a problem during updating, please retry!"
-                  end
-                  FileUtils.rm_f slist
+                  @logger.warn "There was a problem during updating, please retry!" unless done
                 end
               end
             when :wd
@@ -824,7 +839,7 @@ module Six
           # FIXME: This doesn't work with the new popen or is there a way?
           if s.exitstatus > 0
             @logger.debug "Exitstatus: #{s.exitstatus}"
-            if (s.exitstatus == 1 && out.size == 0) || s.exitstatus == 5
+            if (s.exitstatus == 1 && out.size == 0)# || s.exitstatus == 5
               return ''
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
