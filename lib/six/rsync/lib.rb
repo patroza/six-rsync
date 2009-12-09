@@ -754,6 +754,7 @@ module Six
           path = @rsync_work_dir || @rsync_dir || @path
 
           opts << "--stats" if @stats
+          opts << "--timeout=300"  # TODO: Timeout set to 5 minutes, might be too long, but needs testing
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
