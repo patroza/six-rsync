@@ -30,10 +30,10 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.2.6'
+      VERSION = '0.2.7'
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
-      ENV['PATH'] = ENV['PATH'] + ";#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')}"
+      ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};" + ENV['PATH']
       # No meaning on Cygwin 1.7
       # ENV['CYGWIN'] = "nontsec"
 
