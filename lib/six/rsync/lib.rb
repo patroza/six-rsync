@@ -329,18 +329,18 @@ module Six
             host = config[:hosts].sample
 
             verfile_srv = File.join(".pack", ".repository.yml")
+            verbose = @verbose
+            @verbose = false
             begin
-              verbose = @verbose
-              @verbose = false
               fetch_file(verfile_srv, host)
-              @verbose = verbose
             rescue
-              @verbose = verbose
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
               @logger.debug "#{$!}"
               # raise RsyncExecuteError
             end
+            @verbose = verbose
+
             load_repos(:remote)
             if @repos_local[:version] < @repos_remote[:version] # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
@@ -495,6 +495,8 @@ module Six
           ## Pack
           if online
             b = false
+            verbose = @verbose
+            @verbose = false
             while hosts.size > 0 && !done do
               # FIXME: Nasty
               host = hosts.sample if b
@@ -503,10 +505,7 @@ module Six
               @logger.info "Trying #{host}"
 
               begin
-                verbose = @verbose
-                @verbose = false
                 fetch_file(".pack/.repository.yml", host)
-                @verbose = verbose
 
                 load_repos(:remote)
                 load_repos(:local)
@@ -520,12 +519,7 @@ module Six
                 @logger.debug "#{$!}"
               end
             end
-            # TODO: CLEANUP, Should depricate in time.
-            if FileTest.exists? pack_path('.repository.yml')
-              [pack_path('.version'), pack_path('.sums.yml'), File.join(@rsync_work_dir, '.sums.yml')].each do |f|
-                FileUtils.rm_f f if FileTest.exists? f
-              end
-            end
+            @verbose = verbose
           end
           if done || online
             # TODO: Don't do actions when not online
@@ -612,9 +606,6 @@ module Six
         end
 
         def load_config
-          # TODO: Remove after a while, depricated .pack
-          old = File.join(@rsync_work_dir, '.pack')
-          FileUtils.mv(old, pack_path) if FileTest.exists?(old)
           load_yaml(File.join(rsync_path, 'config.yml'))
         end
 
@@ -648,11 +639,6 @@ module Six
           config[:pack] = config[:pack].sort
           config[:wd] = config[:wd].sort
           File.open(file, 'w') { |file| file.puts config.to_yaml }
-
-          # TODO: CLEANUP, Should depricate in time.
-          [File.join(@rsync_work_dir, '.rsync/.version'), File.join(@rsync_work_dir, '.rsync/sums_pack.yml'), File.join(@rsync_work_dir, '.rsync/sums_wd.yml')].each do |f|
-            FileUtils.rm_f f  if FileTest.exists? f
-          end
         end
 
         def load_repos(typ)
