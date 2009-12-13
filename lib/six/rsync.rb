@@ -30,7 +30,7 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.2.7'
+      VERSION = '0.2.8'
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
       FOLDER = /(.*)\/(.*)/
       ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};" + ENV['PATH']

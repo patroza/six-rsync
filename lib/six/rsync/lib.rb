@@ -478,7 +478,7 @@ module Six
           del = []
           @repos_local[typ].each_pair do |key, value|
             if @repos_remote[typ][key].nil?
-              @logger.info "File does not exist in remote! #{key}"
+              @logger.info "Removed: #{key}"
               del << key unless config[:exclude].include?(key)
             end
           end
