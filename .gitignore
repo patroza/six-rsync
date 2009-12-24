@@ -1,6 +1,7 @@
 *.log
 doc/
 nbproject/private
+.idea/
 *.yml
 *.txt
 build/
