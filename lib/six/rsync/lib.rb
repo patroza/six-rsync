@@ -413,6 +413,7 @@ module Six
                       host = hosts.sample
                       @logger.info "Trying #{host}"
                     end
+                    slist = nil
                     b = true
                     hosts -= [host]
                     begin
@@ -431,7 +432,8 @@ module Six
                       else
                         c = mismatch.size
                         @logger.info "Fetching #{mismatch.size} files... Please wait"
-                        slist = File.join(TOOLS_PATH, ".six-updater_#{rand 9999}-list")
+                        slist = File.join(ENV['TEMP'], ".six-updater_#{rand 9999}-list")
+                        slist.gsub!("\\", "/")
                         File.open(slist, 'w') do |f|
                           mismatch.each { |e| f.puts e }
                         end
@@ -440,24 +442,25 @@ module Six
                   
                         arr_opts << RSH if host[/\A(\w)*\@/]
 
-                        slist = "\"#{slist}\""
+                        cyg_slist = "\"#{slist}\""
 
-                        while slist[WINDRIVE] do
-                          drive = slist[WINDRIVE]
-                          slist.gsub!(drive, "\"/cygdrive/#{$1}")
+                        while cyg_slist[WINDRIVE] do
+                          drive = cyg_slist[WINDRIVE]
+                          cyg_slist.gsub!(drive, "\"/cygdrive/#{$1}")
                         end
-                        arr_opts << "--files-from=#{slist}"
+                        arr_opts << "--files-from=#{cyg_slist}"
 
                         arr_opts << esc(File.join(host, '.pack/.'))
                         arr_opts << esc(pack_path)
 
                         command('', arr_opts)
-                        FileUtils.rm_f slist
                       end
                       done = true
                     rescue
                       @logger.warn "Failure"
                       @logger.debug "#{$!}"
+                    ensure
+                      FileUtils.rm_f slist if slist
                     end
                   end
                   @logger.warn "There was a problem during updating, please retry!" unless done

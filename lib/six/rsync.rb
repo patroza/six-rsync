@@ -30,8 +30,9 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.2.8'
+      VERSION = '0.3.1'
       TOOLS_PATH = File.join(BASE_PATH, 'tools')
+
       FOLDER = /(.*)\/(.*)/
       ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};" + ENV['PATH']
       # No meaning on Cygwin 1.7
