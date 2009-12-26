@@ -432,7 +432,7 @@ module Six
                       else
                         c = mismatch.size
                         @logger.info "Fetching #{mismatch.size} files... Please wait"
-                        slist = File.join(ENV['TEMP'], ".six-updater_#{rand 9999}-list")
+                        slist = File.join(TEMP_PATH, ".six-updater_#{rand 9999}-list")
                         slist.gsub!("\\", "/")
                         File.open(slist, 'w') do |f|
                           mismatch.each { |e| f.puts e }
