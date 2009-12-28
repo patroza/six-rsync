@@ -418,8 +418,8 @@ module Six
                     hosts -= [host]
                     begin
                       # TODO: Progress bar
-                      if mismatch.count > (@repos_remote[typ].count / 2)
-                        @logger.info "Many files mismatched (#{mismatch.count}), running full update on .pack folder"
+                      if mismatch.size > (@repos_remote[typ].size / 2)
+                        @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
                         arr_opts = []
                         arr_opts << PARAMS
                         if host[/\A(\w)*\@/]
@@ -793,16 +793,33 @@ module Six
           #puts rsync_cmd
           s = nil
           out = ''
-          $stdout.sync = true # Seems to fix C:/Packaging/six-updater/NEW - Copy/ruby/lib/ruby/gems/1.9.1/gems/log4r-1.0.5/lib/log4r/outputter/iooutputter.rb:43:in `flush': Broken pipe (Errno::EPIPE)
+          #$stdout.sync = true # Seems to fix C:/Packaging/six-updater/NEW - Copy/ruby/lib/ruby/gems/1.9.1/gems/log4r-1.0.5/lib/log4r/outputter/iooutputter.rb:43:in `flush': Broken pipe (Errno::EPIPE)
 
           # Simpler method but on windows the !? exitstatus is not working properly..
           # Does nicely display error output in logwindow though
-          #io = IO.popen(rsync_cmd)
-          #io.sync = true
-          #io.each do |buffer|
-          #  process_msg buffer
-          #  out << buffer
-          #end
+          io = IO.popen(rsync_cmd)
+          io.sync = true
+          io.each do |buffer|
+            process_msg buffer
+            out << buffer
+          end
+          status = 0
+          if out[/rsync error: .* \(code ([0-9]*)\)/]
+            status = $1
+          end
+          #puts "Status: #{status} Exitstatus: #{$?.exitstatus}"
+          if status > 0
+            if status == 1 && out == ''
+              return ''
+            end
+            if out.to_s =~ /max connections \((.*)\) reached/
+              @logger.warn "Server reached maximum connections."
+            end
+            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
+          end
+
+=begin
+          #`#{rsync_cmd}`.chomp
           status = Open3.popen3(rsync_cmd) { |io_in, io_out, io_err, waitth|
             io_out.sync = true
             io_err.sync = true
@@ -837,6 +854,7 @@ module Six
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
           end
+=end
           status
         end
 
