@@ -804,8 +804,8 @@ module Six
             out << buffer
           end
           status = 0
-          if out[/rsync error: .* \(code ([0-9]*)\)/]
-            status = $1
+          if out.to_s[/rsync error: .* \(code ([0-9]*)\)/]
+            status = $1.to_s.to_i
           end
           #puts "Status: #{status} Exitstatus: #{$?.exitstatus}"
           if status > 0
