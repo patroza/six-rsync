@@ -2,6 +2,7 @@
 
 # TODO: Cleanup mess
 
+gem 'log4r', '= 1.1.2'
 require 'log4r'
 require 'six/rsync'
 require 'six/rsync/options'

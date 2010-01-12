@@ -12,7 +12,7 @@ require 'rake/testtask'
 
 spec = Gem::Specification.new do |s|
   s.name = 'six-rsync'
-  s.version = '0.3.3'
+  s.version = '0.3.4'
   s.has_rdoc = true
   s.extra_rdoc_files = ['README', 'LICENSE']
   s.summary = 'Your summary here'
@@ -20,6 +20,7 @@ spec = Gem::Specification.new do |s|
   s.author = 'Sickboy'
   s.email = 'sb@dev-heaven.net'
   # s.executables = ['your_executable_here']
+  s.add_dependency('log4r', '= 1.1.2')
   s.files = %w(LICENSE README Rakefile) + Dir.glob("{bin,spec}/**/*") + Dir.glob("lib/*/**/*.rb")
   s.require_path = "lib"
   s.bindir = "bin"
