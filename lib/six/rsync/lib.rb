@@ -127,27 +127,43 @@ module Six
             raise RsyncError
           end
 
-          #unpack
+          hosts = config[:hosts].clone
 
           # FIXME: This does not work when not forced, as host is sampled in comparesums :)
-          host = config[:hosts].sample
+          host = hosts.sample
 
           if opts[:force]
-            @logger.info "Trying: #{host}, please wait..."
-            arr_opts = []
-            arr_opts << PARAMS
-            arr_opts += x_opts
-            if host[/\A(\w)*\@/]
-              arr_opts << RSH#"-e ssh"
+            done = false
+            b = false
+            verbose = @verbose
+            @verbose = false
+            while hosts.size > 0 && !done do
+              # FIXME: Nasty
+              host = hosts.sample if b
+              b = true
+              hosts -= [host]
+              @logger.info "Trying #{host}"
+
+              begin
+                arr_opts = []
+                arr_opts << PARAMS
+                arr_opts += x_opts
+                if host[/\A(\w)*\@/]
+                  arr_opts << RSH#"-e ssh"
+                end
+                # TODO: UNCLUSTERFUCK
+                arr_opts << esc(File.join(host, '.pack/.'))
+                arr_opts << esc(pack_path)
+                command(cmd, arr_opts)
+                calc
+                save_repos
+                done = true
+              rescue
+                @logger.debug "#{$!}"
+              end
             end
-
-            # TODO: UNCLUSTERFUCK
-            arr_opts << esc(File.join(host, '.pack/.'))
-            arr_opts << esc(pack_path)
-
-            command(cmd, arr_opts)
-            calc
-            save_repos
+            @verbose = verbose
+            raise RsyncError if !done
           else
             #reset(:hard => true)
             calc
