@@ -90,18 +90,22 @@ module Six
         end
       end
 
-      parse_options
+	  unless defined?(Ocra)
+		  parse_options
 
-      unless ARGV[0]
-        logger.error "No folder argument given!"
-        Process.exit
-      end
+		  if ARGV.empty?
+			logger.error "No folder argument given!"
+			Process.exit
+		  end
 
 
-      #app = App.new(ARGV[0])
-      @@options.each do |option|
-        App.send option, ARGV[0]
-      end
-    end
+		  #app = App.new(ARGV[0])
+		  ARGV.each do |arg|
+			@@options.each do |option|
+				App.send option, arg
+			end
+		  end
+		end
+	  end
   end
 end
