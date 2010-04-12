@@ -127,6 +127,9 @@ module Six
             raise RsyncError
           end
 
+          load_repos(:local)
+          load_repos(:remote)
+
           hosts = config[:hosts].clone
 
           # FIXME: This does not work when not forced, as host is sampled in comparesums :)
@@ -265,29 +268,6 @@ module Six
             end
           end
 
-=begin
-          i = 0
-          ar.each do |file|
-            i += 1
-            unless file[/\.gz\Z/]
-              relative = file.clone
-              relative.gsub!(@rsync_work_dir, '')
-              relative.gsub!(/\A[\\|\/]/, '')
-              #checksum = md5(file)
-              if @repos_local[:wd][relative] != @repos_remote[:wd][relative]
-                relative[/(.*)\/(.*)/]
-                folder = $1
-                change = true
-                @logger.info "Packing #{i}/#{ar.size}: #{relative}"
-                gzip(file)
-                #@repos_local[:wd][relative] = checksum
-                @repos_local[:pack]["#{relative}.gz"] = md5("#{file}.gz")
-                FileUtils.mkdir_p pack_path(folder) if folder
-                FileUtils.mv("#{file}.gz", pack_path("#{relative}.gz"))
-              end
-            end
-          end
-=end
           # Deleted files
           @logger.info "Checking for deleted files..."
 
@@ -307,36 +287,6 @@ module Six
             end
           end
 
-=begin
-          p @repos_local[:wd]
-          ar2 = Dir[File.join(@rsync_work_dir, '/.rsync/.pack/**/*')]
-          i = 0
-          ar2.each do |file|
-            i += 1
-            if file[/\.gz\Z/]
-              relative = file.clone
-              relative.gsub!(@rsync_work_dir, '')
-              relative.gsub!(/\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
-              local = relative.clone
-              local.gsub!(/\.gz\Z/, '')
-              p file
-              p local
-              p @repos_local[:wd][local]
-              puts
-              if @repos_local[:wd][local].nil?
-                relative[/(.*)\/(.*)/]
-                folder = $1
-                change = true
-                @logger.info "Deleting #{i}/#{ar2.size}: #{relative}"
-                @repos_local[:wd].delete local
-                @repos_local[:pack].delete relative
-                FileUtils.rm_f(file)
-              end
-            end
-          end
-=end
-
-          #gets
           if change
             @logger.info "Changes found!"
             cmd = ''
@@ -358,6 +308,7 @@ module Six
             @verbose = verbose
 
             load_repos(:remote)
+
             if @repos_local[:version] < @repos_remote[:version] # && !force
               @logger.warn "WARNING, version on server is NEWER, aborting!"
               raise RsyncError
@@ -524,6 +475,7 @@ module Six
               @logger.info "Trying #{host}"
 
               begin
+                FileUtils.cp(pack_path(".repository.yml"), rsync_path(".repository-pack.yml"))
                 fetch_file(".pack/.repository.yml", host)
 
                 load_repos(:remote)
@@ -531,16 +483,19 @@ module Six
 
                 if @repos_local[:version] > @repos_remote[:version] # && !force
                   @logger.warn "WARNING, version on server is OLDER, aborting!"
+                  FileUtils.cp(rsync_path(".repository-pack.yml"), pack_path(".repository.yml"))
                   raise RsyncError
                 end
                 done = true
               rescue
                 @logger.debug "#{$!}"
+              ensure
+                FileUtils.rm(rsync_path(".repository-pack.yml"))
               end
             end
             @verbose = verbose
           end
-          if done || online
+          if done && online
             # TODO: Don't do actions when not online
             @logger.info "Verifying Packed files..."
             compare_set(:pack, host)
@@ -666,14 +621,7 @@ module Six
           when :local
             File.open(rsync_path('.repository.yml')) { |file| config = YAML::load(file) }
           when :remote
-            if FileTest.exists?(pack_path('.repository.yml'))
-              File.open(pack_path('.repository.yml')) { |file| config = YAML::load(file) }
-            else
-              # Deprecated
-              config[:wd] = File.open(File.join(@rsync_work_dir, '.sums.yml')) { |file| YAML::load(file) }
-              config[:pack] = File.open(pack_path('.sums.yml')) { |file| YAML::load(file) }
-              config[:version] = File.open(pack_path('.version')) { |file| file.read.to_i }
-            end
+            File.open(pack_path('.repository.yml')) { |file| config = YAML::load(file) }
           end
 
           [:wd, :pack].each do |t|
