@@ -506,6 +506,9 @@ module Six
         end
 
         private
+        def esc(val); "\"#{val}\""; end
+        def escape(s); "\"" + s.to_s.gsub('\"', '\"\\\"\"') + "\""; end
+
         def config
           cfg = @config ||= YAML::load(DEFAULT_CONFIG)
           cfg[:exclude] = [] unless cfg[:exclude]
@@ -523,14 +526,6 @@ module Six
           p = File.join(@rsync_work_dir, DIR_PACK)
           p = File.join(p, path) unless path.size == 0
           p
-        end
-
-        def esc(val)
-          "\"#{val}\""
-        end
-
-        def escape(s)
-          "\"" + s.to_s.gsub('\"', '\"\\\"\"') + "\""
         end
 
         def fetch_file(path, host)
@@ -579,9 +574,7 @@ module Six
           h
         end
 
-        def load_config
-          load_yaml(File.join(rsync_path, 'config.yml'))
-        end
+        def load_config; load_yaml(File.join(rsync_path, 'config.yml')); end
 
         def load_yaml(file)
           if FileTest.exist?(file)
@@ -728,11 +721,7 @@ module Six
 
           while rsync_cmd[WINDRIVE] do
             drive = rsync_cmd[WINDRIVE]
-            #if ENV['six-app-root']
-            #  rsync_cmd.gsub!(drive, "\"#{ENV['six-app-root']}") # /cygdrive/#{$1}
-            #else
             rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
-            #end
           end
 
           if @logger
@@ -746,18 +735,14 @@ module Six
             out = run_command(rsync_cmd, &block)
           end
 
-          #@logger.debug(out)
-
           out
         end
 
         def run_command(rsync_cmd, &block)
           # TODO: Make this switchable? Verbosity ?
           # Or actually parse this live for own stats?
-          #puts rsync_cmd
           s = nil
           out = ''
-          #$stdout.sync = true # Seems to fix C:/Packaging/six-updater/NEW - Copy/ruby/lib/ruby/gems/1.9.1/gems/log4r-1.0.5/lib/log4r/outputter/iooutputter.rb:43:in `flush': Broken pipe (Errno::EPIPE)
 
           # Simpler method but on windows the !? exitstatus is not working properly..
           # Does nicely display error output in logwindow though
@@ -767,58 +752,18 @@ module Six
             process_msg buffer
             out << buffer
           end
-          status = 0
-          if out.to_s[/rsync error: .* \(code ([0-9]*)\)/]
-            status = $1.to_s.to_i
-          end
-          #puts "Status: #{status} Exitstatus: #{$?.exitstatus}"
+
+          out.to_s[/rsync error: .* \(code ([0-9]*)\)/]
+          status = $1 ? $1 : 0
+
           if status > 0
-            if status == 1 && out == ''
-              return ''
-            end
+            return '' if status == 1 && out == ''
             if out.to_s =~ /max connections \((.*)\) reached/
               @logger.warn "Server reached maximum connections."
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
           end
 
-=begin
-          #`#{rsync_cmd}`.chomp
-          status = Open3.popen3(rsync_cmd) { |io_in, io_out, io_err, waitth|
-            io_out.sync = true
-            io_err.sync = true
-
-            io_out.each do |buffer|
-              process_msg buffer
-              out << buffer
-            end
-
-            #while !io_out.eof?
-            #  buffer = io_out.readline
-            #  # print buf#.gsub("\r", '')
-            #  process_msg buffer
-            #  out << buffer
-            #end
-            error = io_err.gets
-            if error
-              @logger.debug "Error: " + error.chomp
-              #     exit
-            end
-            #   puts "Result: " + io_out.gets
-            s = waitth.value
-          }
-          # FIXME: This doesn't work with the new popen or is there a way?
-          if s.exitstatus > 0
-            @logger.debug "Exitstatus: #{s.exitstatus}"
-            if (s.exitstatus == 1 && out.size == 0)# || s.exitstatus == 5
-              return ''
-            end
-            if out.to_s =~ /max connections \((.*)\) reached/
-              @logger.warn "Server reached maximum connections."
-            end
-            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
-          end
-=end
           status
         end
 
@@ -831,32 +776,8 @@ module Six
             print msg if @verbose
           end
           msg
-
-=begin
-          m = nil
-          if msg[/\r/]
-            # TODO; must still be written even if there is no next message :P
-
-            if @write
-              print msg
-            end
-            m = msg.gsub("\r", '')
-            #@previous = m
-          else
-            m = msg
-            #if @previous
-            #  @logger.debug @previous
-            #  @previous = nil
-            #end
-            #unless @previous
-            #  @logger.debug m
-            #end
-            @logger.debug m
-            puts m if @write
-          end
-          m
-=end
         end
+
       end
     end
   end
