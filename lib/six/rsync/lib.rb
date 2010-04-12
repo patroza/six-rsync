@@ -9,7 +9,6 @@ module Six
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
       REGEX_FOLDER = /(.*)[\\|\/](.*)/
-
       class RsyncExecuteError < StandardError; end
       class RsyncError < StandardError; end
 
@@ -18,6 +17,7 @@ module Six
         PROTECTED = false
         WINDRIVE = /\"(\w)\:/
         DEFAULT_CONFIG = {:hosts => [], :exclude => []}.to_yaml
+        DEFAULT_TIMEOUT = 60
         PARAMS = if PROTECTED
           "--dry-run --times -O --no-whole-file -r --delete --progress -h --exclude=.rsync"
         else
@@ -47,7 +47,7 @@ module Six
           FileUtils.mkdir_p etc
           fstab = File.join(etc, 'fstab')
           str = ""
-          str = File.open(fstab) {|file| file.read} if FileTest.exist?(fstab)
+          str = File.open(fstab) {|file| file.read} if File.exists?(fstab)
           unless str[/cygdrive/]
             str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
             File.open(fstab, 'w') {|file| file.puts str}
@@ -56,11 +56,11 @@ module Six
 
         def init
           @logger.info "Processing: #{rsync_path}"
-          if FileTest.exist? rsync_path
+          if File.exists? rsync_path
             @logger.error "Seems to already be an Rsync repository, Aborting!"
             raise RsyncError
           end
-          if FileTest.exist? @rsync_work_dir
+          if File.exists? @rsync_work_dir
             @logger.error "Seems to already be a folder, Aborting!"
             raise RsyncError
           end
@@ -264,7 +264,7 @@ module Six
               file[REGEX_FOLDER]
               folder = $2
 
-              @logger.info "Removing #{i}/#{@repos_remote[:wd].size}: #{packed}"
+              @logger.info "Removing: #{packed}"
               @repos_local[:wd].delete key
               @repos_local[:pack].delete packed              
               FileUtils.rm_f(file) if File.exists?(file)
@@ -273,7 +273,6 @@ module Six
 
           if change
             @logger.info "Changes found!"
-            cmd = ''
             save_repos(:local)
 
             host = config[:hosts].sample
@@ -390,7 +389,6 @@ module Six
                         end
                         arr_opts = []
                         arr_opts << PARAMS
-                  
                         arr_opts << RSH if host[/\A(\w)*\@/]
 
                         cyg_slist = "\"#{slist}\""
@@ -418,25 +416,18 @@ module Six
                 end
               end
             when :wd
-              c = mismatch.size
-              i = 0
-              mismatch.each do |e|
+              mismatch.each_with_index do |e, index|
                 # TODO: Nicer progress bar...
-                i += 1
-                @logger.info "Unpacking #{i}/#{c}: #{e}"
+                @logger.info "Unpacking #{index + 1}/#{mismatch.size}: #{e}"
                 unpack(:path => "#{e}.gz")
               end
             end
           end
 
-          del = []
           @repos_local[typ].each_pair do |key, value|
-            if @repos_remote[typ][key].nil?
-              @logger.info "Removed: #{key}"
-              del << key unless config[:exclude].include?(key)
-            end
+            del_file(key, typ) unless config[:exclude].include?(key) || !@repos_remote[typ][key].nil?
           end
-          del.each { |e| del_file(e, typ) }
+
           @repos_local[typ] = calc_sums(typ)
           @repos_local[:version] = @repos_remote[:version]
           save_repos
@@ -561,7 +552,7 @@ module Six
         def load_config; load_yaml(File.join(rsync_path, 'config.yml')); end
 
         def load_yaml(file)
-          if FileTest.exist?(file)
+          if File.exists?(file)
             YAML::load_file(file)
           else
             nil
@@ -622,7 +613,10 @@ module Six
           when :wd
             file
           end
-          FileUtils.rm_f File.join(@rsync_work_dir, file)
+          if File.exists?(file)
+            FileUtils.rm_f File.join(@rsync_work_dir, file)
+            @logger.info "Removed: #{file}"
+          end
         end
 
         def md5(path)
@@ -698,7 +692,7 @@ module Six
           path = @rsync_work_dir || @rsync_dir || @path
 
           opts << "--stats" if @stats
-          opts << "--timeout=60"
+          opts << "--timeout=#{DEFAULT_TIMEOUT}"
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
           rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
@@ -737,15 +731,16 @@ module Six
             out << buffer
           end
 
-          out.to_s[/rsync error: .* \(code ([0-9]*)\)/]
+          out[/rsync error: .* \(code ([0-9]*)\)/]
           status = $1 ? $1 : 0
 
           if status > 0
             return '' if status == 1 && out == ''
-            if out.to_s =~ /max connections \((.*)\) reached/
-              @logger.warn "Server reached maximum connections."
+            case out
+              when /max connections \((.*)\) reached/ 
+                @logger.warn "Server reached maximum connections."
             end
-            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out.to_s)
+            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out)
           end
 
           status
