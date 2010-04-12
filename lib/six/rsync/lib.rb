@@ -141,9 +141,8 @@ module Six
                 arr_opts << PARAMS
                 arr_opts += x_opts
                 if host[/\A(\w)*\@/]
-                  arr_opts << RSH#"-e ssh"
+                  arr_opts << RSH #"-e ssh"
                 end
-                # TODO: UNCLUSTERFUCK
                 arr_opts << esc(File.join(host, '.pack/.'))
                 arr_opts << esc(pack_path)
                 command(cmd, arr_opts)
