@@ -1,8 +1,5 @@
 # encoding: UTF-8
 
-# TODO: Add Rsync add, commit and push (Update should be pull?), either with staging like area like Git, or add is pack into .pack, and commit is update sum ?
-# TODO: Seperate command lib from custom layer over rsync?
-
 module Six
   module Repositories
     module Rsync
@@ -13,11 +10,8 @@ module Six
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
       REGEX_FOLDER = /(.*)[\\|\/](.*)/
 
-      class RsyncExecuteError < StandardError
-      end
-
-      class RsyncError < StandardError
-      end
+      class RsyncExecuteError < StandardError; end
+      class RsyncError < StandardError; end
 
       class Lib
         attr_accessor :verbose
@@ -36,6 +30,7 @@ module Six
           @path = nil
           @stats = false
           @verbose = true
+          @logger = logger
 
           @repos_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
           @repos_remote = {:pack => Hash.new, :wd => Hash.new, :version => 0}
@@ -47,7 +42,6 @@ module Six
             @rsync_dir = base[:repository]
             @rsync_work_dir = base[:working_directory]
           end
-          @logger = logger
 
           etc = File.join(TOOLS_PATH, 'etc')
           FileUtils.mkdir_p etc
@@ -101,10 +95,7 @@ module Six
             rescue RsyncError
               @logger.error "Unable to sucessfully update, aborting..."
               @logger.debug "#{$!}"
-              # Dangerous? :D
               FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
-              #rescue
-              #  FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             end
           rescue RsyncError
             @logger.error "Unable to initialize"
@@ -131,8 +122,6 @@ module Six
           load_repos(:remote)
 
           hosts = config[:hosts].clone
-
-          # FIXME: This does not work when not forced, as host is sampled in comparesums :)
           host = hosts.sample
 
           if opts[:force]
@@ -218,11 +207,7 @@ module Six
                 end
               end
             end
-            if change
-              save_repos
-              #File.open(File.join(@rsync_work_dir, '.sums.yml'), 'w') { |file| file.puts remote_wd[:list].sort.to_yaml }
-              #File.open(pack_path('.sums.yml'), 'w') { |file| file.puts remote_pack[:list].sort.to_yaml }
-            end
+            save_repos if change
           else
 
           end
@@ -248,7 +233,6 @@ module Six
           @repos_local[:wd] = calc_sums(:wd)
           # Added or Changed files
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-
 
           change = false
           i = 0
