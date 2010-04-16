@@ -54,6 +54,44 @@ module Six
           end
         end
 
+        def status
+          @logger.info "Showing changes on #{@rsync_work_dir}"
+          @config = load_config
+          unless @config
+            @logger.error "Not an Rsync repository!"
+            return
+          end
+
+          load_repos(:local)
+          load_repos(:remote)
+
+          @logger.info "Calculating Checksums..."
+          @repos_local[:wd] = calc_sums(:wd)
+          # Added or Changed files
+          ar = Dir[File.join(@rsync_work_dir, '/**/*')]
+
+          change = false
+          i = 0
+          @repos_local[:wd].each_pair do |key, value|
+            i += 1
+            if value != @repos_remote[:wd][key]
+              change = true
+              @logger.info "Modified: #{i}/#{@repos_local[:wd].size}: #{key}"
+            end
+          end
+
+          # Deleted files
+          @logger.info "Checking for deleted files..."
+
+          i = 0
+          @repos_remote[:wd].each_pair do |key, value|
+            i += 1
+            if @repos_local[:wd][key].nil?
+              @logger.info "Removed: #{packed}"
+            end
+          end
+        end
+
         def init
           @logger.info "Processing: #{rsync_path}"
           if File.exists? rsync_path
@@ -254,6 +292,7 @@ module Six
           # Deleted files
           @logger.info "Checking for deleted files..."
 
+          i = 0
           @repos_remote[:wd].each_pair do |key, value|
             i += 1
             if @repos_local[:wd][key].nil?

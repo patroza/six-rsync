@@ -139,7 +139,7 @@ module Six
 
         # returns a Rsync::Status object
         def status
-          Rsync::Status.new(self)
+          lib.status
         end
 
         # this is a convenience method for accessing the class that wraps all the

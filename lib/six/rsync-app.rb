@@ -75,6 +75,12 @@ module Six
           app
         end
 
+        def self.status(folder)
+          app = self.new(folder)
+          app.repo.status
+          app
+        end
+
         def self.clone(folder)
           folder[/(.*)[\/|\\](.*)/]
           pa, folder = $1, $2

@@ -24,6 +24,10 @@ module Six
             todo << :init if bool
           end
 
+          opts.on("-s", "--status", "Status of Repository") do |bool|
+            todo << :status if bool
+          end
+
           opts.on("-u", "--update", "Updates Repository") do |bool|
             todo << :update if bool
           end
