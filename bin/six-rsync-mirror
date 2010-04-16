@@ -4,7 +4,7 @@
 begin
   load 'six/rsync-mirror.rb'
 rescue => e
-  puts e.class, e.message, backtrace.join("\n")
+  puts e.class, e.message, e.backtrace.join("\n")
   begin
       require 'fileutils'
       dpath = Dir.pwd
@@ -17,7 +17,7 @@ rescue => e
       end
       path = File.join(dpath, "logs")
       FileUtils.mkdir_p path unless File.exists?(path)
-      File.open(File.join(path, "six-rsync-error.log"), 'w') {|f| f.puts err}
+      File.open(File.join(path, "six-rsync-error.log"), 'w') {|f| f.puts e.class, e.message, e.backtrace.join("\n")}
   rescue
       puts "ERROR: #{$!}"
   end
