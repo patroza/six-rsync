@@ -19,11 +19,11 @@ spec = Gem::Specification.new do |s|
   s.description = s.summary
   s.author = 'Sickboy'
   s.email = 'sb@dev-heaven.net'
-  # s.executables = ['your_executable_here']
   s.add_dependency('log4r', '>= 1.1.2')
   s.files = %w(LICENSE README Rakefile) + Dir.glob("{bin,spec}/**/*") + Dir.glob("lib/*/**/*.rb")
   s.require_path = "lib"
   s.bindir = "bin"
+  s.executables = ['six-rsync', 'six-rsync-mirror']
 end
 
 Rake::GemPackageTask.new(spec) do |p|
