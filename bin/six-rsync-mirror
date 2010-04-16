@@ -4,25 +4,24 @@
 gem 'six-rsync'
 
 begin
-	load 'six/rsync-mirror.rb'
-rescue
-	err = "ERROR: #{$!}"
-	puts err
-	begin
-		require 'fileutils'
-		dpath = Dir.pwd
-		unless File.exists?(File.join(Dir.pwd, "legacy.txt"))
-		  if ENV['APPDATA']
-			if ENV['APPDATA'].size > 0
-			  dpath = File.join(ENV['APPDATA'], 'Six-Updater') if File.directory?(ENV['APPDATA'])
-			end
-		  end
-		end
-		path = File.join(dpath, "logs")
-		FileUtils.mkdir_p path unless File.exists?(path)
-		File.open(File.join(path, "six-rsync-error.log"), 'w') {|f| f.puts err}
-	rescue
-	    puts "ERROR: #{$!}"
-	end
-	sleep 10
+  load 'six/rsync-mirror.rb'
+rescue => e
+  puts e.class, e.message, backtrace.join("\n")
+  begin
+      require 'fileutils'
+      dpath = Dir.pwd
+      unless File.exists?(File.join(Dir.pwd, "legacy.txt"))
+        if ENV['APPDATA']
+          if ENV['APPDATA'].size > 0
+            dpath = File.join(ENV['APPDATA'], 'Six-Updater') if File.directory?(ENV['APPDATA'])
+          end
+        end
+      end
+      path = File.join(dpath, "logs")
+      FileUtils.mkdir_p path unless File.exists?(path)
+      File.open(File.join(path, "six-rsync-error.log"), 'w') {|f| f.puts err}
+  rescue
+      puts "ERROR: #{$!}"
+  end
+  sleep 10
 end

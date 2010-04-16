@@ -5,8 +5,8 @@
 PATH = ARGV[0]
 ARGV -= [PATH]
 ARGV.each do |repo|
-        puts
-        puts "Processing: #{repo}"
-        system "rsync -e ssh --exclude bis --include .repository.yml --times -O --no-whole-file -r --delete --stats --progress #{PATH}. #{repo}"
-        puts
+  puts
+  puts "Processing: #{repo}"
+  system "rsync -e ssh --exclude bis --include .repository.yml --times -O --no-whole-file -r --delete --stats --progress #{PATH}. #{repo}"
+  puts
 end
