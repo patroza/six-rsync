@@ -1,8 +1,6 @@
 #!/usr/bin/ruby
 # encoding: utf-8
 
-gem 'six-rsync'
-
 begin
   load 'six/rsync-app.rb'
 rescue => e
