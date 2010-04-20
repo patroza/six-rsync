@@ -5,7 +5,9 @@ module Six
     module Rsync
       # TODO: Configure somewhere!
       KEY = "C:/users/sb/documents/keys/id_rsa.ppk"
+      # TODO: Linux
       RSH = "-r --rsh=\"'#{File.join(BASE_PATH, "tools", "bin", "cygnative.exe")}' plink.exe -i #{KEY}\""
+
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
       REGEX_FOLDER = /(.*)[\\|\/](.*)/
