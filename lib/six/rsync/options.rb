@@ -41,6 +41,10 @@ module Six
             @@host = s
           end
 
+          opts.on("-l", "--log", "Write logfile") do |bool|
+            options[:logging] = bool if bool
+          end
+
 =begin
         opts.on("--depth I", Integer, "Clone depth, default: #{@config[:depth]}. Set to 0 to clone all history") do |s|
           options[:depth] = s
@@ -51,7 +55,8 @@ module Six
         end
 =end
         end.parse!
-        @@options = todo
+        todo, options
+
 =begin
       default = if (todo + second_todo + general_todo).size > 0
         false

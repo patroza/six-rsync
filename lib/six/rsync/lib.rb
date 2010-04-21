@@ -101,8 +101,10 @@ module Six
             raise RsyncError
           end
           if File.exists? @rsync_work_dir
-            @logger.error "Seems to already be a folder, Aborting!"
-            raise RsyncError
+            unless Dir[File.join(@rsync_work_dir, '*')].empty?
+              @logger.error "Seems to already be a folder, Aborting!"
+              raise RsyncError
+            end
           end
           FileUtils.mkdir_p pack_path
           save_config(config)

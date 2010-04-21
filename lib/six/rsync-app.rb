@@ -12,43 +12,19 @@ module Six
     module Rsync
       COMPONENT = 'six-rsync'
 
-      # Create loggers
-      @@log = Log4r::Logger.new(COMPONENT)
-      if defined?(DEBUG)
-        format1 = Log4r::PatternFormatter.new(:pattern => "[%l] %d: %m", :date_pattern => '%H:%M:%S')
-      else
-        format1 = Log4r::PatternFormatter.new(:pattern => "%m")
-      end
-      format2 = Log4r::PatternFormatter.new(:pattern => "[%l] %c %d: %m", :date_pattern => '%H:%M:%S')
-
-      # Create Outputters
-      o_file = Log4r::FileOutputter.new "#{COMPONENT}-file",
-        'level' => 0, # All
-      :filename => "#{COMPONENT}.log",
-        'formatter' =>  format2
-      #:maxsize => 1024
-
-      @@log.outputters << o_file
-
-      o_out = Log4r::StdoutOutputter.new "#{COMPONENT}-stdout",
-        'level' => 2, # no DEBUG
-      'formatter' =>  format1
-
-      o_err = Log4r::StderrOutputter.new "#{COMPONENT}-stderr",
-        'level' => 4, # Error and Up
-      'formatter' =>  format1
-
-      @@log.outputters << o_out << o_err
-
       module_function
+
       def logger
         @@log
       end
+
       def host
         @@host
       end
+
       class App
         attr_reader :repo
+
         def logger
           Six::Repositories::Rsync.logger
         end
@@ -96,22 +72,52 @@ module Six
         end
       end
 
-	  unless defined?(Ocra)
-		  parse_options
+      unless defined?(Ocra)
+        options, todo = parse_options
 
-		  if ARGV.empty?
-			logger.error "No folder argument given!"
-			Process.exit
-		  end
+        # Create loggers
+        @@log = Log4r::Logger.new(COMPONENT)
+        format1 = if defined?(DEBUG)
+          Log4r::PatternFormatter.new(:pattern => "[%l] %d: %m", :date_pattern => '%H:%M:%S')
+        else
+          Log4r::PatternFormatter.new(:pattern => "%m")
+        end
+        format2 = Log4r::PatternFormatter.new(:pattern => "[%l] %c %d: %m", :date_pattern => '%H:%M:%S')
+
+        # Create Outputters
+        if options[:logging]
+          o_file = Log4r::FileOutputter.new "#{COMPONENT}-file",
+                                            'level' => 0, # All
+                                            :filename => "#{COMPONENT}.log",
+                                            'formatter' =>  format2
+          #:maxsize => 1024
+          @@log.outputters << o_file
+        end
+
+        o_out = Log4r::StdoutOutputter.new "#{COMPONENT}-stdout",
+                                           'level' => 2, # no DEBUG
+                                           'formatter' =>  format1
+
+        o_err = Log4r::StderrOutputter.new "#{COMPONENT}-stderr",
+                                           'level' => 4, # Error and Up
+                                           'formatter' =>  format1
+
+        @@log.outputters << o_out << o_err
+
+        if ARGV.empty?
+          ARGV = '.'
+          #logger.error "Using current folder"
+          #Process.exit
+        end
 
 
-		  #app = App.new(ARGV[0])
-		  ARGV.each do |arg|
-			@@options.each do |option|
-				App.send option, arg
-			end
-		  end
-		end
-	  end
+        #app = App.new(ARGV[0])
+        ARGV.each do |arg|
+          todo.each do |option|
+            App.send option, arg
+          end
+        end
+      end
+    end
   end
 end
