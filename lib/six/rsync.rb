@@ -52,16 +52,6 @@ module Six
 
           TOOLS_PATH = File.join(BASE_PATH, 'tools')
           ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
-
-          etc = File.join(TOOLS_PATH, 'etc')
-          FileUtils.mkdir_p etc
-          fstab = File.join(etc, 'fstab')
-          str = ""
-          str = File.open(fstab) {|file| file.read} if File.exists?(fstab)
-          unless str[/cygdrive/]
-            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
-            File.open(fstab, 'w') {|file| file.puts str}
-          end
         else
           HOME_PATH = '~'
           TEMP_PATH = '/tmp'
@@ -71,7 +61,7 @@ module Six
       rsync_installed = begin; %x[rsync --version]; true; rescue; false; end
       unless rsync_installed
         puts "rsync command not found"
-        Process.exit
+        raise RsyncError
       end
 
       # No meaning on Cygwin 1.7

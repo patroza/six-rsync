@@ -92,7 +92,7 @@ module Six
           end
           if File.exists? @rsync_work_dir
             unless Dir[File.join(@rsync_work_dir, '*')].empty?
-              @logger.error "Seems to already be a folder, Aborting!"
+              @logger.error "Folder not empty, Aborting!"
               raise RsyncError
             end
           end
@@ -666,13 +666,19 @@ module Six
         def zip7(file)
           out = %x[7z x #{esc(file)} -y]
           @logger.debug out
+          raise RsyncError if $? != 0
           out
         end
 
         def gzip(file)
+          unless @gzip_installed ||= begin; %x[gzip --rsyncable]; $? == 0; rescue; false; end
+            puts "gzip command not found, or doesn't support --rsyncable"
+            raise RsyncError
+          end
           @logger.debug "Gzipping #{file}"
           out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
           @logger.debug out
+          raise RsyncError if $? != 0
         end
 
         def unpack_file(file, path)
