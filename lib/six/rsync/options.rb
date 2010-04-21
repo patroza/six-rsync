@@ -44,59 +44,9 @@ module Six
           opts.on("-l", "--log", "Write logfile") do |bool|
             options[:logging] = bool if bool
           end
-
-=begin
-        opts.on("--depth I", Integer, "Clone depth, default: #{@config[:depth]}. Set to 0 to clone all history") do |s|
-          options[:depth] = s
-        end
-
-        opts.on("--mods S", String, "Additional Mods") do |s|
-          options[:mods] = s
-        end
-=end
         end.parse!
-        todo, options
 
-=begin
-      default = if (todo + second_todo + general_todo).size > 0
-        false
-      else
-        true
-      end
-
-      # TODO: Move this to Updater ?
-      @todo = if todo.size > 0
-        todo
-      else
-        log.info "No parameters given, running the default"
-        #options[:wait] = true
-        if default
-          @config[:defaultactions]
-        else
-          []
-        end
-      end
-      @general_todo = if general_todo.size > 0
-        general_todo
-      else
-        if default
-          @config[:defaultgeneralactions]
-        else
-          []
-        end
-      end
-
-      @second_todo = if second_todo.size > 0
-        second_todo
-      else
-        if default
-          @config[:defaultsecondactions]
-        else
-          []
-        end
-      end
-      @config = @config.merge(options)
-=end
+        [options, todo]
       end
 
     end

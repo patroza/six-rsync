@@ -105,7 +105,7 @@ module Six
         @@log.outputters << o_out << o_err
 
         if ARGV.empty?
-          ARGV = '.'
+          ARGV << '.'
           #logger.error "Using current folder"
           #Process.exit
         end

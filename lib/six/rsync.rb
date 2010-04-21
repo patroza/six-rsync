@@ -35,8 +35,7 @@ module Six
 
       case RUBY_PLATFORM
         when "i386-mingw32"
-          HOME_PATH = File.join(ENV['APPDATA'], 'six-rsync')
-          ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
+          HOME_PATH = File.join(ENV['APPDATA'])
           TEMP_PATH = if ENV['TEMP']
             if ENV['TEMP'].size > 0
               if File.directory?(ENV['TEMP'])
@@ -52,6 +51,8 @@ module Six
           end
 
           TOOLS_PATH = File.join(BASE_PATH, 'tools')
+          ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
+
           etc = File.join(TOOLS_PATH, 'etc')
           FileUtils.mkdir_p etc
           fstab = File.join(etc, 'fstab')
@@ -62,7 +63,7 @@ module Six
             File.open(fstab, 'w') {|file| file.puts str}
           end
         else
-          HOME_PATH = '~/six-rsync'
+          HOME_PATH = '~'
           TEMP_PATH = '/tmp'
       end
       DATA_PATH = File.join(HOME_PATH, 'six-rsync')
