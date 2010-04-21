@@ -34,8 +34,7 @@ module Six
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
-        when "i386-mingw32"
-          HOME_PATH = File.join(ENV['APPDATA'])
+        when /-mingw32$/, /-mswin32$/
           TEMP_PATH = if ENV['TEMP']
             if ENV['TEMP'].size > 0
               if File.directory?(ENV['TEMP'])
@@ -49,15 +48,25 @@ module Six
           else
             BASE_PATH
           end
-
-          TOOLS_PATH = File.join(BASE_PATH, 'tools')
-          ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
+          HOME_PATH = File.exists?(File.join(ENV['APPDATA'])) ? File.join(ENV['APPDATA']) : TEMP_PATH
         else
           HOME_PATH = '~'
           TEMP_PATH = '/tmp'
       end
       DATA_PATH = File.join(HOME_PATH, 'six-rsync')
+      CONFIG_FILE = File.join(DATA_PATH, 'config.yml')
+      if File.exists?(DATA_PATH)
+        unless File.directory?(DATA_PATH)
+          puts "#{DATA_PATH} is a file instead of folder"
+          raise StandardError
+        end
+      else
+        FileUtils.mkdir_p DATA_PATH
+      end
+      config = File.exists?(CONFIG_FILE) ? YAML::load_file(CONFIG_FILE) : nil 
+      CONFIG = config ? config : Hash.new
 
+      # which rsync - should return on linux the bin location
       rsync_installed = begin; %x[rsync --version]; true; rescue; false; end
       unless rsync_installed
         puts "rsync command not found"

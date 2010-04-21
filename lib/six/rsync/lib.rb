@@ -3,14 +3,10 @@
 module Six
   module Repositories
     module Rsync
-      # TODO: Configure somewhere!
-      KEY = "C:/users/sb/documents/keys/id_rsa.ppk"
-      # TODO: Linux
-      RSH = "-r --rsh=\"'#{File.join(BASE_PATH, "tools", "bin", "cygnative.exe")}' plink.exe -i #{KEY}\""
-
+      REGEX_FOLDER = /(.*)[\\|\/](.*)/
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
-      REGEX_FOLDER = /(.*)[\\|\/](.*)/
+
       class RsyncExecuteError < StandardError; end
       class RsyncError < StandardError; end
 
@@ -33,6 +29,15 @@ module Six
           @stats = false
           @verbose = true
           @logger = logger
+
+          case RUBY_PLATFORM
+            when /-mingw32$/, /-mswin32$/
+              key = CONFIG[:key] ? CONFIG[:key] : ""
+              @rsh = "-r --rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\""
+              puts @rsh
+            else
+              @rsh = ""
+          end
 
           @repos_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
           @repos_remote = {:pack => Hash.new, :wd => Hash.new, :version => 0}
@@ -173,7 +178,7 @@ module Six
                 arr_opts << PARAMS
                 arr_opts += x_opts
                 if host[/\A(\w)*\@/]
-                  arr_opts << RSH #"-e ssh"
+                  arr_opts << @rsh #"-e ssh"
                 end
                 arr_opts << esc(File.join(host, '.pack/.'))
                 arr_opts << esc(pack_path)
@@ -350,7 +355,7 @@ module Six
 
           # Upload .pack changes
           if host[/\A(\w)*\@/]
-            arr_opts << RSH
+            arr_opts << @rsh
           end
           arr_opts << esc(pack_path('.'))
           arr_opts << esc(File.join(host, '.pack'))
@@ -405,7 +410,7 @@ module Six
                         arr_opts = []
                         arr_opts << PARAMS
                         if host[/\A(\w)*\@/]
-                          arr_opts << RSH
+                          arr_opts << @rsh
                         end
 
                         arr_opts << esc(File.join(host, '.pack/.'))
@@ -421,7 +426,7 @@ module Six
                         end
                         arr_opts = []
                         arr_opts << PARAMS
-                        arr_opts << RSH if host[/\A(\w)*\@/]
+                        arr_opts << @rsh if host[/\A(\w)*\@/]
 
                         cyg_slist = "\"#{slist}\""
 
@@ -545,7 +550,7 @@ module Six
           arr_opts = []
           arr_opts << PARAMS
           if host[/\A(\w)*\@/]
-            arr_opts << RSH
+            arr_opts << @rsh
           end
           arr_opts << esc(File.join(host, path))
           arr_opts << esc(rsync_path(folder))
