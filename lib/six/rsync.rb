@@ -68,6 +68,12 @@ module Six
       end
       DATA_PATH = File.join(HOME_PATH, 'six-rsync')
 
+      rsync_installed = begin; %x[rsync --version]; true; rescue; false; end
+      unless rsync_installed
+        puts "rsync command not found"
+        Process.exit
+      end
+
       # No meaning on Cygwin 1.7
       # ENV['CYGWIN'] = "nontsec"
 
