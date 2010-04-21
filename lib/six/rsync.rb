@@ -30,7 +30,7 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.4.4'
+      VERSION = '0.4.5'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
@@ -65,13 +65,6 @@ module Six
       end
       config = File.exists?(CONFIG_FILE) ? YAML::load_file(CONFIG_FILE) : nil 
       CONFIG = config ? config : Hash.new
-
-      # which rsync - should return on linux the bin location
-      rsync_installed = begin; %x[rsync --version]; true; rescue; false; end
-      unless rsync_installed
-        puts "rsync command not found"
-        raise RsyncError
-      end
 
       # No meaning on Cygwin 1.7
       # ENV['CYGWIN'] = "nontsec"

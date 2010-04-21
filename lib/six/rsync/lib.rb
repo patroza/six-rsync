@@ -34,9 +34,15 @@ module Six
             when /-mingw32$/, /-mswin32$/
               key = CONFIG[:key] ? CONFIG[:key] : ""
               @rsh = "-r --rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\""
-              puts @rsh
             else
               @rsh = ""
+          end
+
+          # which rsync - should return on linux the bin location
+          rsync_installed = begin; %x[rsync --version]; true; rescue; false; end
+          unless rsync_installed
+            puts "rsync command not found"
+            raise RsyncError
           end
 
           @repos_local = {:pack => Hash.new, :wd => Hash.new, :version => 0}
