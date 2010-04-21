@@ -31,23 +31,41 @@ module Six
 
     module Rsync
       VERSION = '0.4.1'
-      TOOLS_PATH = File.join(BASE_PATH, 'tools')
-
       FOLDER = /(.*)\/(.*)/
-      ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
-      TEMP_PATH = if ENV['TEMP']
-        if ENV['TEMP'].size > 0
-          if File.directory?(ENV['TEMP'])
-            ENV['TEMP']
+
+      case RUBY_PLATFORM
+        when "i386-mingw32"
+          HOME_PATH = File.join(ENV['APPDATA'], 'six-rsync')
+          ENV['PATH'] = "#{TOOLS_PATH};#{File.join(TOOLS_PATH, 'bin')};#{ENV['PATH']}"
+          TEMP_PATH = if ENV['TEMP']
+            if ENV['TEMP'].size > 0
+              if File.directory?(ENV['TEMP'])
+                ENV['TEMP']
+              else
+                BASE_PATH
+              end
+            else
+              BASE_PATH
+            end
           else
             BASE_PATH
           end
+
+          TOOLS_PATH = File.join(BASE_PATH, 'tools')
+          etc = File.join(TOOLS_PATH, 'etc')
+          FileUtils.mkdir_p etc
+          fstab = File.join(etc, 'fstab')
+          str = ""
+          str = File.open(fstab) {|file| file.read} if File.exists?(fstab)
+          unless str[/cygdrive/]
+            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
+            File.open(fstab, 'w') {|file| file.puts str}
+          end
         else
-          BASE_PATH
-        end
-      else
-        BASE_PATH
+          HOME_PATH = '~/six-rsync'
+          TEMP_PATH = '/tmp'
       end
+      DATA_PATH = File.join(HOME_PATH, 'six-rsync')
 
       # No meaning on Cygwin 1.7
       # ENV['CYGWIN'] = "nontsec"

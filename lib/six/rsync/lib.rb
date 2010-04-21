@@ -44,16 +44,6 @@ module Six
             @rsync_dir = base[:repository]
             @rsync_work_dir = base[:working_directory]
           end
-
-          etc = File.join(TOOLS_PATH, 'etc')
-          FileUtils.mkdir_p etc
-          fstab = File.join(etc, 'fstab')
-          str = ""
-          str = File.open(fstab) {|file| file.read} if File.exists?(fstab)
-          unless str[/cygdrive/]
-            str += "\nnone /cygdrive cygdrive user,noacl,posix=0 0 0\n"
-            File.open(fstab, 'w') {|file| file.puts str}
-          end
         end
 
         def status
@@ -424,7 +414,7 @@ module Six
                       else
                         c = mismatch.size
                         @logger.info "Fetching #{mismatch.size} files... Please wait"
-                        slist = File.join(TEMP_PATH, ".six-updater_#{rand 9999}-list")
+                        slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
                         slist.gsub!("\\", "/")
                         File.open(slist, 'w') do |f|
                           mismatch.each { |e| f.puts e }
