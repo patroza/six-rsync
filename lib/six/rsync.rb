@@ -30,7 +30,7 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.4.3'
+      VERSION = '0.4.4'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
