@@ -10,8 +10,6 @@ require 'six/rsync/options'
 module Six
   module Repositories
     module Rsync
-      COMPONENT = 'six-rsync'
-
       module_function
 
       def logger

@@ -30,18 +30,15 @@ module Six
     end
 
     module Rsync
-      VERSION = '0.4.5'
+      COMPONENT = 'six-rsync'
+      VERSION = '0.4.6'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
         when /-mingw32$/, /-mswin32$/
           TEMP_PATH = if ENV['TEMP']
             if ENV['TEMP'].size > 0
-              if File.directory?(ENV['TEMP'])
-                ENV['TEMP']
-              else
-                BASE_PATH
-              end
+              File.directory?(ENV['TEMP']) ? ENV['TEMP'] : BASE_PATH
             else
               BASE_PATH
             end
@@ -50,10 +47,10 @@ module Six
           end
           HOME_PATH = File.exists?(File.join(ENV['APPDATA'])) ? File.join(ENV['APPDATA']) : TEMP_PATH
         else
-          HOME_PATH = '~'
+          HOME_PATH = '~/'
           TEMP_PATH = '/tmp'
       end
-      DATA_PATH = File.join(HOME_PATH, 'six-rsync')
+      DATA_PATH = File.join(HOME_PATH, COMPONENT)
       CONFIG_FILE = File.join(DATA_PATH, 'config.yml')
       if File.exists?(DATA_PATH)
         unless File.directory?(DATA_PATH)
