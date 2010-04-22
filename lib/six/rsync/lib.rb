@@ -680,7 +680,7 @@ module Six
         end
 
         def zip7(file)
-          unless @zip7_installed ||= begin; %x[7z]; $? == 0; rescue; false; end
+          unless @zip7_installed ||= begin; %x[7z --help]; $? == 0; rescue; false; end
             puts "7z command not found"
             raise RsyncError
           end
@@ -691,7 +691,7 @@ module Six
         end
 
         def gzip(file)
-          unless @gzip_installed ||= begin; %x[gzip --rsyncable]; $? == 0; rescue; false; end
+          unless @gzip_installed ||= begin; %x[gzip --rsyncable --help]; $? == 0; rescue; false; end
             puts "gzip command not found, or doesn't support --rsyncable"
             raise RsyncError
           end
