@@ -663,7 +663,7 @@ module Six
         end
 
         def md5(path)
-          unless @md5_installed ||= begin; %x[md5sum]; $? == 0; rescue; false; end
+          unless @md5_installed ||= begin; %x[md5sum --help]; $? == 0; rescue; false; end
             puts "md5sum command not found"
             raise RsyncError
           end
