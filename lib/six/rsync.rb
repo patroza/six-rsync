@@ -31,7 +31,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.4.6'
+      VERSION = '0.4.7'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
@@ -47,7 +47,7 @@ module Six
           end
           HOME_PATH = File.exists?(File.join(ENV['APPDATA'])) ? File.join(ENV['APPDATA']) : TEMP_PATH
         else
-          HOME_PATH = '~/'
+          HOME_PATH = ENV['HOME']
           TEMP_PATH = '/tmp'
       end
       DATA_PATH = File.join(HOME_PATH, COMPONENT)
