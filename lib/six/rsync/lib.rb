@@ -650,14 +650,14 @@ module Six
         end
 
         def del_file(file, typ, opts = {})
-          file = case typ
+          path = case typ
           when :pack
-            File.join(DIR_PACK, file)
+            File.join(@rsync_work_dir, DIR_PACK, file)
           when :wd
-            file
+            File.join(@rsync_work_dir, file)
           end
-          if File.exists?(file)
-            FileUtils.rm_f File.join(@rsync_work_dir, file)
+          if File.exists?(path)
+            FileUtils.rm_f File.join(path)
             @logger.info "Removed: #{file}"
           end
         end

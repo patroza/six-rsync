@@ -31,7 +31,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.4.7'
+      VERSION = '0.4.8'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
