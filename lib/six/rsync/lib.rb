@@ -663,6 +663,11 @@ module Six
         end
 
         def md5(path)
+          unless @md5_installed ||= begin; %x[md5sum]; $? == 0; rescue; false; end
+            puts "md5sum command not found"
+            raise RsyncError
+          end
+
           unless File.directory? path
             path[/(.*)[\/|\\](.*)/]
             folder, file = $1, $2
@@ -675,6 +680,10 @@ module Six
         end
 
         def zip7(file)
+          unless @zip7_installed ||= begin; %x[7z]; $? == 0; rescue; false; end
+            puts "7z command not found"
+            raise RsyncError
+          end
           out = %x[7z x #{esc(file)} -y]
           @logger.debug out
           raise RsyncError if $? != 0
