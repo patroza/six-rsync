@@ -90,7 +90,7 @@ module Six
           @repos_remote[:wd].each_pair do |key, value|
             i += 1
             if @repos_local[:wd][key].nil?
-              @logger.info "Removed: #{packed}"
+              @logger.info "Removed: #{key}"
             end
           end
         end
