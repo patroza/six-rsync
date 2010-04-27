@@ -135,14 +135,14 @@ module Six
             arr_opts << "-I" if opts[:force]
             begin
               update('', arr_opts)
-            rescue RsyncError
-              @logger.error "Unable to sucessfully update, aborting..."
-              @logger.debug "#{$!}"
+            rescue RsyncError => e
+              @logger.error "Unable to sucessfully update, aborting... (#{e.class}: #{e.message})"
+              @logger.debug e.backtrace.join("\n") 
               FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             end
-          rescue RsyncError
-            @logger.error "Unable to initialize"
-            @logger.debug "#{$!}"
+          rescue RsyncError => e
+            @logger.error "Unable to initialize (#{e.class}: #{e.message})"
+            @logger.debug e.backtrace.join("\n")
           end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
@@ -178,7 +178,6 @@ module Six
               b = true
               hosts -= [host]
               @logger.info "Trying #{host}"
-
               begin
                 arr_opts = []
                 arr_opts << PARAMS
@@ -192,8 +191,9 @@ module Six
                 calc
                 save_repos
                 done = true
-              rescue
-                @logger.debug "#{$!}"
+              rescue => e
+                @logger.warn "#{e.class}: #{e.message}"
+                @logger.debug e.backtrace.join("\n")
               end
             end
             @verbose = verbose
@@ -505,8 +505,9 @@ module Six
                   raise RsyncError
                 end
                 done = true
-              rescue
-                @logger.debug "#{$!}"
+              rescue => e
+                @logger.warn "#{e.class}: #{e.message}"
+                @logger.debug e.backtrace.join("\n") 
               ensure
                 FileUtils.rm(rsync_path(".repository-pack.yml"))
               end
@@ -790,7 +791,7 @@ module Six
           end
 
           out[/rsync error: .* \(code ([0-9]*)\)/]
-          status = $1 ? $1 : 0
+          status = $1 ? $1.to_i : 0
 
           if status > 0
             return '' if status == 1 && out == ''
