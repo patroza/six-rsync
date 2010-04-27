@@ -255,7 +255,13 @@ module Six
           end
         end
 
+        def rename(entry, newentry)
+          FileUtils.mv(entry, "#{entry}_tmp")
+          FileUtils.mv("#{entry}_tmp", newentry)
+        end
+
         def commit
+          cfg = CONFIG[:commit] ? CONFIG[:commit] : Hash.new
           @logger.info "Committing changes on #{@rsync_work_dir}"
           @config = load_config
           unless @config
@@ -270,6 +276,26 @@ module Six
 
           load_repos(:local)
           load_repos(:remote)
+
+
+=begin
+  # TODO: Rewrite
+          if cfg[:force_downcase]
+            # Run through all files, only in the working folder!, and downcase those which are not
+            Dir.glob(File.join(@rsync_work_dir, '**', '*')).each do |entry|
+              dirname, base = File.dirname(entry), File.basename(entry)
+              if base[/[A-Z]/]
+                part = entry.sub("#{@rsync_work_dir}", '')
+                part.sub!(/^\//, "")
+                if @repos_local[:wd][part]
+                  @repos_local[:wd].delete part
+                  @repos_local[:wd][]
+                end
+                rename(entry, File.join(dirname, base.downcase))
+              end
+            end
+          end
+=end
 
           @logger.info "Calculating Checksums..."
           @repos_local[:wd] = calc_sums(:wd)
