@@ -811,10 +811,29 @@ module Six
           # Does nicely display error output in logwindow though
           io = IO.popen(rsync_cmd)
           io.sync = true
-          io.each do |buffer|
-            process_msg buffer
-            out << buffer
+
+          #io.each do |buffer|
+          #  process_msg buffer
+          #  out << buffer
+          #end
+
+          buff = []
+          io.each_byte do |buffer|
+            buffer = buffer.chr
+            buff << buffer
+            if ["\n", "\r"].include?(buffer)
+              b = buff.join("")
+              process_msg b
+              out << b
+              buff = []
+            end
           end
+
+          unless buff.empty?
+            b = buff.join("")
+            process_msg b
+            out << b
+          end        
 
           out[/rsync error: .* \(code ([0-9]*)\)/]
           status = $1 ? $1.to_i : 0
@@ -832,9 +851,9 @@ module Six
         end
 
         def process_msg(msg)
-          if msg[/[k|m|g]?B\/s/i]
-            msg.gsub!("\n", '')
-            print "#{msg}\r" if @verbose
+          if msg[/\r/] #msg[/[k|m|g]?B\/s/i]
+            #msg.gsub!("\n", '')
+            print msg if @verbose
           else
             @logger.debug msg
             print msg if @verbose
