@@ -811,6 +811,8 @@ module Six
           # Does nicely display error output in logwindow though
           io = IO.popen(rsync_cmd)
           io.sync = true
+          oldsync = STDOUT.sync
+          STDOUT.sync = true
 
           #io.each do |buffer|
           #  process_msg buffer
@@ -846,6 +848,8 @@ module Six
             end
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out)
           end
+
+          STDOUT.sync = false unless STDOUT.sync == oldsync
 
           status
         end
