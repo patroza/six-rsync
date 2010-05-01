@@ -10,8 +10,8 @@ rescue => e
       path = File.join(Six::Repositories::Rsync::DATA_PATH, 'logs')
       FileUtils.mkdir_p path unless File.exists?(path)
       File.open(File.join(path, "six-rsync-error.log"), 'w') {|f| f.puts e.class, e.message, e.backtrace.join("\n")}
-  rescue
-      puts "ERROR: #{$!}"
+  rescue => e
+      puts "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
   end
   sleep 10
 end

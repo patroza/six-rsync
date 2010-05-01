@@ -351,10 +351,10 @@ module Six
             @verbose = false
             begin
               fetch_file(verfile_srv, host)
-            rescue
+            rescue => e
               # FIXME: Should never assume that :)
               @logger.warn "Unable to retrieve version file from server, repository probably doesnt exist!"
-              @logger.debug "#{$!}"
+              @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
               # raise RsyncExecuteError
             end
             @verbose = verbose
@@ -474,9 +474,9 @@ module Six
                         command('', arr_opts)
                       end
                       done = true
-                    rescue
+                    rescue => e
                       @logger.warn "Failure"
-                      @logger.debug "#{$!}"
+                      @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
                     ensure
                       FileUtils.rm_f slist if slist
                     end
