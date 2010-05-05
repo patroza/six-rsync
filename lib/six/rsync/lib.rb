@@ -654,12 +654,11 @@ module Six
         end
 
         def load_repos(typ)
-          config = Hash.new
-          case typ
+          config = case typ
           when :local
-            File.open(rsync_path('.repository.yml')) { |file| config = YAML::load(file) }
+            YAML::load_file(rsync_path('.repository.yml'))
           when :remote
-            File.open(pack_path('.repository.yml')) { |file| config = YAML::load(file) }
+            YAML::load_file(pack_path('.repository.yml'))
           end
 
           [:wd, :pack].each do |t|

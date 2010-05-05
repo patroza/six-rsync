@@ -19,7 +19,7 @@ case RUBY_VERSION
 when /1\.8\.[0-9]/
   class Array
     def sample
-      self[rand self.size]
+      self[rand(self.size)]
     end
   end
 end
@@ -31,7 +31,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.5.3'
+      VERSION = '0.5.4'
       FOLDER = /(.*)\/(.*)/
 
       case RUBY_PLATFORM
