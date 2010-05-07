@@ -59,11 +59,7 @@ module Six
 
         def status
           @logger.info "Showing changes on #{@rsync_work_dir}"
-          @config = load_config
-          unless @config
-            @logger.error "Not an Rsync repository!"
-            return
-          end
+          handle_config
 
           load_repos(:local)
           load_repos(:remote)
@@ -113,101 +109,6 @@ module Six
           save_repos(:remote)
         end
 
-        def clone(repository, name, opts = {})
-          @path = opts[:path] || '.'
-          @rsync_work_dir = opts[:path] ? File.join(@path, name) : name
-
-          # TODO: Solve logger mess completely.
-          @logger = opts[:log] if opts[:log]
-
-          case repository
-          when Array
-            config[:hosts] += repository
-          when String
-            config[:hosts] << repository
-          end
-
-          begin
-            init
-
-            # TODO: Eval move to update?
-            arr_opts = []
-            arr_opts << "-I" if opts[:force]
-            begin
-              update('', arr_opts)
-            rescue RsyncError => e
-              @logger.error "Unable to sucessfully update, aborting... (#{e.class}: #{e.message})"
-              @logger.debug e.backtrace.join("\n") 
-              FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
-            end
-          rescue RsyncError => e
-            @logger.error "Unable to initialize (#{e.class}: #{e.message})"
-            @logger.debug e.backtrace.join("\n")
-          end
-
-          opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
-        end
-
-        def update(cmd, x_opts = [], opts = {})
-          @logger.debug "Checking for updates..."
-          @config = load_config
-          unless @config
-            @logger.error "Not an Rsync repository!"
-            raise RsyncError
-          end
-
-          unless config[:hosts].size > 0
-            @logger.error "No hosts configured!"
-            raise RsyncError
-          end
-
-          load_repos(:local)
-          load_repos(:remote)
-
-          hosts = config[:hosts].clone
-          host = hosts.sample
-
-          if opts[:force]
-            done = false
-            b = false
-            verbose = @verbose
-            @verbose = false
-            while hosts.size > 0 && !done do
-              # FIXME: Nasty
-              host = hosts.sample if b
-              b = true
-              hosts -= [host]
-              @logger.info "Trying #{host}"
-              begin
-                arr_opts = []
-                arr_opts << PARAMS
-                arr_opts += x_opts
-                if host[/\A(\w)*\@/]
-                  arr_opts << @rsh #"-e ssh"
-                end
-                arr_opts << esc(File.join(host, '.pack/.'))
-                arr_opts << esc(pack_path)
-                command(cmd, arr_opts)
-                calc
-                save_repos
-                done = true
-              rescue => e
-                @logger.warn "#{e.class}: #{e.message}"
-                @logger.debug e.backtrace.join("\n")
-              end
-            end
-            @verbose = verbose
-            raise RsyncError if !done
-          else
-            #reset(:hard => true)
-            calc
-            save_repos
-
-            # fetch latest sums and only update when changed
-            compare_sums(true, host)
-          end          
-        end
-
         # TODO: Allow local-self healing, AND remote healing. reset and fetch?
         def reset(opts = {})
           @logger.info "Resetting!"
@@ -255,28 +156,14 @@ module Six
           end
         end
 
-        def rename(entry, newentry)
-          FileUtils.mv(entry, "#{entry}_tmp")
-          FileUtils.mv("#{entry}_tmp", newentry)
-        end
-
         def commit
           cfg = CONFIG[:commit] ? CONFIG[:commit] : Hash.new
           @logger.info "Committing changes on #{@rsync_work_dir}"
-          @config = load_config
-          unless @config
-            @logger.error "Not an Rsync repository!"
-            return
-          end
-
-          unless config[:hosts].size > 0
-            @logger.error "No hosts configured!"
-            return
-          end
+          handle_config
+          handle_hosts
 
           load_repos(:local)
           load_repos(:remote)
-
 
 =begin
   # TODO: Rewrite
@@ -379,7 +266,9 @@ module Six
 
         def push(host = nil)
           @logger.info "Pushing..."
-          @config = load_config
+          handle_config
+          handle_hosts
+
           host = config[:hosts].sample unless host
           # TODO: UNCLUSTERFUCK
           arr_opts = []
@@ -394,11 +283,150 @@ module Six
 
           command('', arr_opts)
         end
+        def clone(repository, name, opts = {})
+          @path = opts[:path] || '.'
+          @rsync_work_dir = opts[:path] ? File.join(@path, name) : name
 
-        def compare_set(typ, host, online = true)
+          # TODO: Solve logger mess completely.
+          @logger = opts[:log] if opts[:log]
+
+          case repository
+          when Array
+            config[:hosts] += repository
+          when String
+            config[:hosts] << repository
+          end
+
+          begin
+            init
+
+            # TODO: Eval move to update?
+            arr_opts = []
+            arr_opts << "-I" if opts[:force]
+            begin
+              update('', arr_opts)
+            rescue RsyncError => e
+              @logger.error "Unable to sucessfully update, aborting... (#{e.class}: #{e.message})"
+              @logger.debug e.backtrace.join("\n")
+              FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
+            end
+          rescue RsyncError => e
+            @logger.error "Unable to initialize (#{e.class}: #{e.message})"
+            @logger.debug e.backtrace.join("\n")
+          end
+
+          opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
+        end
+
+        def update(cmd, x_opts = [], opts = {})
+          @logger.debug "Checking for updates..."
+
+          handle_config
+          handle_hosts
+
           load_repos(:local)
           load_repos(:remote)
 
+          hosts = config[:hosts].clone
+          host = hosts.sample
+
+          if opts[:force]
+            done = false
+            b = false
+            verbose = @verbose
+            @verbose = false
+            until hosts.empty? || done do
+              # FIXME: Nasty
+              host = hosts.sample if b
+              b = true
+              hosts -= [host]
+              @logger.info "Trying #{host}"
+              begin
+                arr_opts = []
+                arr_opts << PARAMS
+                arr_opts += x_opts
+                if host[/\A(\w)*\@/]
+                  arr_opts << @rsh #"-e ssh"
+                end
+                arr_opts << esc(File.join(host, '.pack/.'))
+                arr_opts << esc(pack_path)
+                command(cmd, arr_opts)
+                calc
+                save_repos
+                done = true
+              rescue => e
+                @logger.warn "#{e.class}: #{e.message}"
+                @logger.debug e.backtrace.join("\n")
+              end
+            end
+            @verbose = verbose
+            raise RsyncError if !done
+          else
+            #reset(:hard => true)
+            calc
+            save_repos
+
+            # fetch latest sums and only update when changed
+            compare_sums(true, host)
+          end
+        end
+
+        def compare_sums(online = true, host = config[:hosts].sample)
+          done = false
+
+          load_repos(:local)
+
+          ## Pack
+          if online
+            hosts = config[:hosts].clone
+            b = false
+            verbose = @verbose
+            @verbose = false
+
+            until hosts.empty? || done do
+              # FIXME: Nasty
+              host = hosts.sample if b
+              b = true
+              hosts -= [host]
+              @logger.info "Trying #{host}"
+
+              begin
+                FileUtils.cp(pack_path(".repository.yml"), rsync_path(".repository-pack.yml")) if File.exists?(pack_path(".repository.yml"))
+                fetch_file(".pack/.repository.yml", host)
+                load_repos(:remote)
+
+                if @repos_local[:version] > @repos_remote[:version] # && !force
+                  @logger.warn "WARNING, version on server is OLDER, aborting!"
+                  raise RsyncError
+                end
+                done = true
+              rescue => e
+                @logger.warn "#{e.class}: #{e.message}"
+                @logger.debug e.backtrace.join("\n")
+                FileUtils.cp(rsync_path(".repository-pack.yml"), pack_path(".repository.yml")) if File.exists?(rsync_path(".repository-pack.yml"))
+              ensure
+                FileUtils.rm(rsync_path(".repository-pack.yml")) if File.exists?(rsync_path(".repository-pack.yml"))
+              end
+            end
+            @verbose = verbose
+          else
+            load_repos(:remote)
+          end
+
+          if done && online
+            @logger.info "Verifying Packed files..."
+            compare_set(:pack, host)
+
+            @logger.info "Verifying Unpacked files..."
+            compare_set(:wd, host)
+
+            # Bump version and make final save
+            @repos_local[:version] = @repos_remote[:version]
+            save_repos
+          end
+        end
+
+        def compare_set(typ, host, online = true)
           #if local[typ][:md5] == remote[typ][:md5]
           #  @logger.info "#{typ} Match!"
           #else
@@ -426,7 +454,7 @@ module Six
                 ## Pack
                 if online
                   b = false
-                  while hosts.size > 0 && !done do
+                  until hosts.empty? || done do
                     # FIXME: Nasty
                     if b
                       host = hosts.sample
@@ -435,44 +463,30 @@ module Six
                     slist = nil
                     b = true
                     hosts -= [host]
+
+                    # TODO: Progress bar
+                    arr_opts = []
+                    arr_opts << PARAMS
+                    arr_opts << @rsh if host[/\A(\w)*\@/]
+
+                    if mismatch.size > (@repos_remote[typ].size / 2)
+                      # Process full folder
+                      @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
+                    else
+                      # Process only selective
+                      @logger.info "Fetching #{mismatch.size} files... Please wait"
+                      slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
+                      slist.gsub!("\\", "/")
+                      File.open(slist, 'w') { |f| mismatch.each { |e| f.puts e } }
+
+                      arr_opts << "--files-from=#{win2cyg("\"#{slist}\"")}"
+                    end
+
                     begin
-                      # TODO: Progress bar
-                      if mismatch.size > (@repos_remote[typ].size / 2)
-                        @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
-                        arr_opts = []
-                        arr_opts << PARAMS
-                        if host[/\A(\w)*\@/]
-                          arr_opts << @rsh
-                        end
+                      arr_opts << esc(File.join(host, '.pack/.'))
+                      arr_opts << esc(pack_path)
+                      command('', arr_opts)
 
-                        arr_opts << esc(File.join(host, '.pack/.'))
-                        arr_opts << esc(pack_path)
-                        command('', arr_opts)
-                      else
-                        c = mismatch.size
-                        @logger.info "Fetching #{mismatch.size} files... Please wait"
-                        slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
-                        slist.gsub!("\\", "/")
-                        File.open(slist, 'w') do |f|
-                          mismatch.each { |e| f.puts e }
-                        end
-                        arr_opts = []
-                        arr_opts << PARAMS
-                        arr_opts << @rsh if host[/\A(\w)*\@/]
-
-                        cyg_slist = "\"#{slist}\""
-
-                        while cyg_slist[WINDRIVE] do
-                          drive = cyg_slist[WINDRIVE]
-                          cyg_slist.gsub!(drive, "\"/cygdrive/#{$1}")
-                        end
-                        arr_opts << "--files-from=#{cyg_slist}"
-
-                        arr_opts << esc(File.join(host, '.pack/.'))
-                        arr_opts << esc(pack_path)
-
-                        command('', arr_opts)
-                      end
                       done = true
                     rescue => e
                       @logger.warn "Failure"
@@ -497,60 +511,41 @@ module Six
             del_file(key, typ) unless config[:exclude].include?(key) || !@repos_remote[typ][key].nil?
           end
 
+          # Calculate new sums
           @repos_local[typ] = calc_sums(typ)
-          @repos_local[:version] = @repos_remote[:version]
+
+          # Save current progress, incase somewhere else goes wrong.
           save_repos
         end
 
-        def compare_sums(online = true, host = config[:hosts].sample)
-          hosts = config[:hosts].clone
-          done = false
 
-          ## Pack
-          if online
-            b = false
-            verbose = @verbose
-            @verbose = false
-            while hosts.size > 0 && !done do
-              # FIXME: Nasty
-              host = hosts.sample if b
-              b = true
-              hosts -= [host]
-              @logger.info "Trying #{host}"
-
-              begin
-                FileUtils.cp(pack_path(".repository.yml"), rsync_path(".repository-pack.yml"))
-                fetch_file(".pack/.repository.yml", host)
-
-                load_repos(:remote)
-                load_repos(:local)
-
-                if @repos_local[:version] > @repos_remote[:version] # && !force
-                  @logger.warn "WARNING, version on server is OLDER, aborting!"
-                  FileUtils.cp(rsync_path(".repository-pack.yml"), pack_path(".repository.yml"))
-                  raise RsyncError
-                end
-                done = true
-              rescue => e
-                @logger.warn "#{e.class}: #{e.message}"
-                @logger.debug e.backtrace.join("\n") 
-              ensure
-                FileUtils.rm(rsync_path(".repository-pack.yml"))
-              end
-            end
-            @verbose = verbose
-          end
-          if done && online
-            # TODO: Don't do actions when not online
-            @logger.info "Verifying Packed files..."
-            compare_set(:pack, host)
-            @logger.info "Verifying Unpacked files..."
-            compare_set(:wd, host)
-            save_repos
+        private
+        def handle_config
+          @config = load_config
+          unless @config
+            @logger.error "Not an Rsync repository!"
+            raise RsyncError
           end
         end
 
-        private
+        def handle_hosts
+          unless config[:hosts].size > 0
+            @logger.error "No hosts configured!"
+            raise RsyncError
+          end
+        end
+
+        def rename(entry, newentry)
+          FileUtils.mv(entry, "#{entry}_tmp")
+          FileUtils.mv("#{entry}_tmp", newentry)
+        end
+
+        def win2cyg(path)
+          path = path.clone
+          path.gsub!(WINDRIVE) {|s| "\"/cygdrive/#{s}" }
+          path
+        end
+
         def esc(val); "\"#{val}\""; end
         def escape(s); "\"" + s.to_s.gsub('\"', '\"\\\"\"') + "\""; end
 
@@ -563,14 +558,12 @@ module Six
 
         def rsync_path(path = '')
           p = File.join(@rsync_work_dir, DIR_RSYNC)
-          p = File.join(p, path) unless path.size == 0
-          p
+          path.size == 0 ? p : File.join(p, path)
         end
 
         def pack_path(path = '')
           p = File.join(@rsync_work_dir, DIR_PACK)
-          p = File.join(p, path) unless path.size == 0
-          p
+          path.size == 0 ? p : File.join(p, path)
         end
 
         def fetch_file(path, host)
@@ -582,9 +575,7 @@ module Six
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
-          if host[/\A(\w)*\@/]
-            arr_opts << @rsh
-          end
+          arr_opts << @rsh if host[/\A(\w)*\@/]
           arr_opts << esc(File.join(host, path))
           arr_opts << esc(rsync_path(folder))
 
@@ -599,7 +590,7 @@ module Six
         def calc_sums(typ)
           @logger.debug "Calculating checksums of #{typ} files"
           ar = []
-          reg = case typ
+          reg, ar = case typ
           when :pack
             ar = Dir[pack_path('**/*')]
             /\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
@@ -622,11 +613,7 @@ module Six
         def load_config; load_yaml(File.join(rsync_path, 'config.yml')); end
 
         def load_yaml(file)
-          if File.exists?(file)
-            YAML::load_file(file)
-          else
-            nil
-          end
+          File.exists?(file) ? YAML::load_file(file) : nil
         end
 
         def save_default_config
@@ -779,24 +766,11 @@ module Six
           opts << "--timeout=#{DEFAULT_TIMEOUT}"
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
-          rsync_cmd = "rsync #{cmd} #{opts} #{redirect} 2>&1"
+          rsync_cmd = win2cyg("rsync #{cmd} #{opts} #{redirect} 2>&1")
 
-          while rsync_cmd[WINDRIVE] do
-            drive = rsync_cmd[WINDRIVE]
-            rsync_cmd.gsub!(drive, "\"/cygdrive/#{$1}")
-          end
+          @logger.debug(rsync_cmd) if @logger
 
-          if @logger
-            @logger.debug(rsync_cmd)
-          end
-
-          out = nil
-          if chdir && (Dir.getwd != path)
-            Dir.chdir(path) { out = run_command(rsync_cmd, &block) }
-          else
-            out = run_command(rsync_cmd, &block)
-          end
-
+          out = chdir && (Dir.getwd != path) ? Dir.chdir(path) { run_command(rsync_cmd, &block) } : run_command(rsync_cmd, &block) 
           out
         end
 
