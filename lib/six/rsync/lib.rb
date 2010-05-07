@@ -283,6 +283,7 @@ module Six
 
           command('', arr_opts)
         end
+
         def clone(repository, name, opts = {})
           @path = opts[:path] || '.'
           @rsync_work_dir = opts[:path] ? File.join(@path, name) : name
@@ -297,12 +298,12 @@ module Six
             config[:hosts] << repository
           end
 
+          # TODO: Eval move to update?
+          arr_opts = []
+          arr_opts << "-I" if opts[:force]
+
           begin
             init
-
-            # TODO: Eval move to update?
-            arr_opts = []
-            arr_opts << "-I" if opts[:force]
             begin
               update('', arr_opts)
             rescue RsyncError => e
@@ -310,7 +311,7 @@ module Six
               @logger.debug e.backtrace.join("\n")
               FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             end
-          rescue RsyncError => e
+          rescue => e
             @logger.error "Unable to initialize (#{e.class}: #{e.message})"
             @logger.debug e.backtrace.join("\n")
           end
@@ -345,9 +346,7 @@ module Six
                 arr_opts = []
                 arr_opts << PARAMS
                 arr_opts += x_opts
-                if host[/\A(\w)*\@/]
-                  arr_opts << @rsh #"-e ssh"
-                end
+                arr_opts << @rsh if host[/\A(\w)*\@/]
                 arr_opts << esc(File.join(host, '.pack/.'))
                 arr_opts << esc(pack_path)
                 command(cmd, arr_opts)
@@ -372,11 +371,9 @@ module Six
         end
 
         def compare_sums(online = true, host = config[:hosts].sample)
+          load_repos(:local)
           done = false
 
-          load_repos(:local)
-
-          ## Pack
           if online
             hosts = config[:hosts].clone
             b = false
@@ -590,7 +587,7 @@ module Six
         def calc_sums(typ)
           @logger.debug "Calculating checksums of #{typ} files"
           ar = []
-          reg, ar = case typ
+          reg = case typ
           when :pack
             ar = Dir[pack_path('**/*')]
             /\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
@@ -604,8 +601,9 @@ module Six
             relative.gsub!(@rsync_work_dir, '')
             relative.gsub!(reg, '')
 
+            next if config[:exclude].include?(relative)
             sum = md5(file)
-            h[relative] = sum if sum && !config[:exclude].include?(relative)
+            h[relative] = sum if sum
           end
           h
         end
@@ -712,6 +710,7 @@ module Six
           out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
           @logger.debug out
           raise RsyncError if $? != 0
+          out
         end
 
         def unpack_file(file, path)
