@@ -131,18 +131,16 @@ module Six
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
 
             change = false
-            i = 0
-            ar.each do |file|
-              i += 1
-              unless file[/\.gz\Z/]
+            ar.each_with_index do |file, i|
+              unless file[/\.gz$/]
                 relative = file.clone
                 relative.gsub!(@rsync_work_dir, '')
-                relative.gsub!(/\A[\\|\/]/, '')
+                relative.gsub!(/^[\\|\/]/, '')
 
                 checksum = md5(file)
                 if checksum != @repos_remote[:wd][relative]
                   change = true
-                  @logger.info "Packing #{i}/#{ar.size}: #{file}"
+                  @logger.info "Packing #{i + 1}/#{ar.size}: #{file}"
                   gzip(file)
                   @repos_remote[:wd][relative] = checksum
                   @repos_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
@@ -275,7 +273,7 @@ module Six
           arr_opts << PARAMS
 
           # Upload .pack changes
-          if host[/\A(\w)*\@/]
+          if host[/^(\w)*\@/]
             arr_opts << @rsh
           end
           arr_opts << esc(pack_path('.'))
@@ -307,13 +305,14 @@ module Six
             begin
               update('', arr_opts)
             rescue RsyncError => e
-              @logger.error "Unable to sucessfully update, aborting... (#{e.class}: #{e.message})"
+              @logger.error "Unable to sucessfully update... (#{e.class}: #{e.message})"
               @logger.debug e.backtrace.join("\n")
-              FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             end
           rescue => e
             @logger.error "Unable to initialize (#{e.class}: #{e.message})"
             @logger.debug e.backtrace.join("\n")
+            FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
+            raise RsyncError
           end
 
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
@@ -346,7 +345,7 @@ module Six
                 arr_opts = []
                 arr_opts << PARAMS
                 arr_opts += x_opts
-                arr_opts << @rsh if host[/\A(\w)*\@/]
+                arr_opts << @rsh if host[/^(\w)*\@/]
                 arr_opts << esc(File.join(host, '.pack/.'))
                 arr_opts << esc(pack_path)
                 command(cmd, arr_opts)
@@ -464,7 +463,7 @@ module Six
                     # TODO: Progress bar
                     arr_opts = []
                     arr_opts << PARAMS
-                    arr_opts << @rsh if host[/\A(\w)*\@/]
+                    arr_opts << @rsh if host[/^(\w)*\@/]
 
                     if mismatch.size > (@repos_remote[typ].size / 2)
                       # Process full folder
@@ -539,7 +538,11 @@ module Six
 
         def win2cyg(path)
           path = path.clone
-          path.gsub!(WINDRIVE) {|s| "\"/cygdrive/#{s}" }
+          #path.gsub!(WINDRIVE) {|s| "\"/cygdrive/#{s}" }
+          while path[WINDRIVE]
+            drive = path[WINDRIVE]
+            path.gsub!(drive, "\"/cygdrive/#{$1}")
+          end
           path
         end
 
@@ -572,7 +575,7 @@ module Six
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
           arr_opts << PARAMS
-          arr_opts << @rsh if host[/\A(\w)*\@/]
+          arr_opts << @rsh if host[/^(\w)*\@/]
           arr_opts << esc(File.join(host, path))
           arr_opts << esc(rsync_path(folder))
 
@@ -590,10 +593,10 @@ module Six
           reg = case typ
           when :pack
             ar = Dir[pack_path('**/*')]
-            /\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
+            /^[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
           when :wd
             ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-            /\A[\\|\/]/
+            /^[\\|\/]/
           end
           h = Hash.new
           ar.each do |file|
@@ -680,12 +683,11 @@ module Six
           end
 
           unless File.directory? path
-            path[/(.*)[\/|\\](.*)/]
-            folder, file = $1, $2
+            folder, file = File.dirname(path), File.basename(path)
             Dir.chdir(folder) do
               r = %x[md5sum #{esc(file)}]
               @logger.debug r
-              r[/\A\w*/]
+              r[/^\w*/]
             end
           end
         end
@@ -741,7 +743,7 @@ module Six
             unless File.directory? file
               relative = file.clone
               relative.gsub!(@rsync_work_dir, '')
-              relative.gsub!(/\A[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
+              relative.gsub!(/^[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
               fil = relative
               folder = "."
               folder, fil = $1, $2 if relative[/(.*)\/(.*)/]

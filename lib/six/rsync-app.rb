@@ -56,8 +56,12 @@ module Six
         end
 
         def self.clone(folder)
-          folder[/(.*)[\/|\\](.*)/]
-          pa, folder = $1, $2
+          pa = if folder[/[\/|\\]/]
+            folder = File.basename(folder) 
+            File.dirname(folder)
+          else
+            Dir.pwd
+          end
           @repo = Six::Repositories::Rsync.clone(Six::Repositories::Rsync.host, folder, :path => pa, :log => Six::Repositories::Rsync.logger)
         end
 
