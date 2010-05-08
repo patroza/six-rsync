@@ -13,5 +13,4 @@ rescue => e
   rescue => e
       puts "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
   end
-  sleep 5
 end

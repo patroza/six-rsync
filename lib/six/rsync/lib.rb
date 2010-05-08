@@ -299,15 +299,15 @@ module Six
           begin
             init
             begin
-              update('', arr_opts)
+              update('', arr_opts, {:force => true})
             rescue RsyncError => e
-              @logger.error "Unable to sucessfully update... (#{e.class}: #{e.message})"
-              @logger.debug e.backtrace.join("\n")
+              #@logger.error "Unable to sucessfully update... (#{e.class}: #{e.message})"
+              #@logger.debug e.backtrace.join("\n")
             end
           rescue => e
             @logger.error "Unable to initialize (#{e.class}: #{e.message})"
             @logger.debug e.backtrace.join("\n")
-            FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
+            #FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
             raise RsyncError
           end
 
@@ -321,22 +321,28 @@ module Six
           handle_hosts
 
           load_repos(:local)
-          load_repos(:remote)
+          begin
+            load_repos(:remote)
+          rescue
+            @logger.warn "WARN: .pack/.repository.yml seems corrupt, forcing full check"
+            opts[:force] = true
+          end
 
           hosts = config[:hosts].clone
           host = hosts.sample
 
           if opts[:force]
             done = false
-            b = false
-            verbose = @verbose
-            @verbose = false
+            b, i = false, 0
+            #verbose = @verbose
+            #@verbose = false
             until hosts.empty? || done do
+              i += 1
               # FIXME: Nasty
               host = hosts.sample if b
               b = true
               hosts -= [host]
-              @logger.info "Trying #{host}"
+              @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
               begin
                 arr_opts = []
                 arr_opts << PARAMS
@@ -349,12 +355,16 @@ module Six
                 save_repos
                 done = true
               rescue => e
-                @logger.warn "#{e.class}: #{e.message}"
-                @logger.debug e.backtrace.join("\n")
+                @logger.debug "#{e.class}: #{e.message} #{e.backtrace.join("\n")}"
               end
             end
-            @verbose = verbose
-            raise RsyncError if !done
+            #@verbose = verbose
+            if done
+              @logger.info "Verifying Unpacked files..."
+              compare_set(:wd)
+            else
+              raise RsyncError
+            end
           else
             #reset(:hard => true)
             calc
@@ -371,16 +381,17 @@ module Six
 
           if online
             hosts = config[:hosts].clone
-            b = false
+            b, i = false, 0
             verbose = @verbose
             @verbose = false
 
             until hosts.empty? || done do
+              i += 1
               # FIXME: Nasty
               host = hosts.sample if b
               b = true
               hosts -= [host]
-              @logger.info "Trying #{host}"
+              @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
 
               begin
                 FileUtils.cp(pack_path(".repository.yml"), rsync_path(".repository-pack.yml")) if File.exists?(pack_path(".repository.yml"))
@@ -393,8 +404,7 @@ module Six
                 end
                 done = true
               rescue => e
-                @logger.warn "#{e.class}: #{e.message}"
-                @logger.debug e.backtrace.join("\n")
+                @logger.debug "#{e.class} #{e.message}: #{e.backtrace.join("\n")}"
                 FileUtils.cp(rsync_path(".repository-pack.yml"), pack_path(".repository.yml")) if File.exists?(rsync_path(".repository-pack.yml"))
               ensure
                 FileUtils.rm(rsync_path(".repository-pack.yml")) if File.exists?(rsync_path(".repository-pack.yml"))
@@ -444,12 +454,13 @@ module Six
               if online
                 hosts = config[:hosts].clone
                 host = hosts.sample unless host
-                b = false
+                b, i = false, 0
                 until hosts.empty? || done do
+                  i += 1
                   # FIXME: Nasty
                   if b
                     host = hosts.sample
-                    @logger.info "Trying #{host}"
+                    @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
                   end
                   slist = nil
                   b = true
@@ -480,13 +491,15 @@ module Six
 
                     done = true
                   rescue => e
-                    @logger.warn "Failure"
                     @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
                   ensure
                     FileUtils.rm_f slist if slist
                   end
                 end
-                @logger.warn "There was a problem during updating, please retry!" unless done
+                unless done
+                  @logger.warn "Exhausted all mirrors, please retry!"
+                  raise RsyncError
+                end
               end
             when :wd
               mismatch.each_with_index do |e, index|
@@ -761,7 +774,7 @@ module Six
           opts << "--timeout=#{DEFAULT_TIMEOUT}"
 
           opts = [opts].flatten.map {|s| s }.join(' ') # escape()
-          rsync_cmd = win2cyg("rsync #{cmd} #{opts} #{redirect} 2>&1")
+          rsync_cmd = win2cyg("rsync #{cmd} #{opts} #{redirect}") # 2>&1
 
           @logger.debug(rsync_cmd) if @logger
 
@@ -770,37 +783,47 @@ module Six
         end
 
         def run_command(rsync_cmd, &block)
-          out = ''
+          out, err = '', ''
           buff = []
-          status = Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
+          status = nil
+          oldsync = STDOUT.sync
+          STDOUT.sync = true
+
+          po = Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
             io_out.each_byte do |buffer|
               char = buffer.chr
               buff << char
               if ["\n", "\r"].include?(char)
                 b = buff.join("")
-                process_msg b
+                print b if @verbose                
                 out << b
                 buff = []
               end
             end
 
             io_err.each do |line|
+              print line
               case line
               when /max connections \((.*)\) reached/
                 @logger.warn "Server reached maximum connections."
               end
               err << line
             end
+            status = waitth.value
           end
 
           unless buff.empty?
             b = buff.join("")
-            process_msg b
+            print b if @verbose
             out << b
           end
 
-          if status > 0
-            #return 0 if status == 1 && out == ''
+          @logger.debug "Status: #{status}"
+          @logger.debug "Err: #{err}" # TODO: Throw this into the info/error log?
+          @logger.debug "Output: #{out}"
+
+          if status.exitstatus > 0
+            #return 0 if status.exitstatus == 1 && out == ''
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + err + ':' + out)
           end
 
@@ -814,8 +837,6 @@ module Six
           # Does nicely display error output in logwindow though
           io = IO.popen(rsync_cmd)
           io.sync = true
-          oldsync = STDOUT.sync
-          STDOUT.sync = true
 
           #io.each do |buffer|
           #  process_msg buffer
@@ -828,18 +849,6 @@ module Six
                 @logger.warn "Server reached maximum connections."
             end
 =end
-
-        def process_msg(msg)
-          if msg[/\r/] #msg[/[k|m|g]?B\/s/i]
-            #msg.gsub!("\n", '')
-            print msg if @verbose
-          else
-            @logger.debug msg
-            print msg if @verbose
-          end
-          msg
-        end
-
       end
     end
   end
