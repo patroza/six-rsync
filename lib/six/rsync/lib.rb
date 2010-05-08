@@ -3,7 +3,6 @@
 module Six
   module Repositories
     module Rsync
-      REGEX_FOLDER = /(.*)[\\|\/](.*)/
       DIR_RSYNC = '.rsync'
       DIR_PACK = File.join(DIR_RSYNC, '.pack')
 
@@ -195,12 +194,11 @@ module Six
               change = true
               @logger.info "Packing #{i}/#{@repos_local[:wd].size}: #{key}"
               file = File.join(@rsync_work_dir, key)
-              file[REGEX_FOLDER]
-              folder = $1
+              folder = File.dirname(file)
               folder.gsub!(@rsync_work_dir, '')
               gzip(file)
               @repos_local[:pack]["#{key}.gz"] = md5("#{file}.gz")
-              FileUtils.mkdir_p pack_path(folder) if folder
+              FileUtils.mkdir_p pack_path(folder) if folder.size > 0
               FileUtils.mv("#{file}.gz", pack_path("#{key}.gz"))
             end
           end
@@ -215,8 +213,6 @@ module Six
               packed = "#{key}.gz"
               change = true
               file = pack_path(packed)
-              file[REGEX_FOLDER]
-              folder = $2
 
               @logger.info "Removing: #{packed}"
               @repos_local[:wd].delete key
@@ -422,7 +418,7 @@ module Six
           end
         end
 
-        def compare_set(typ, host, online = true)
+        def compare_set(typ, host = nil, online = true)
           #if local[typ][:md5] == remote[typ][:md5]
           #  @logger.info "#{typ} Match!"
           #else
@@ -442,57 +438,55 @@ module Six
             case typ
             when :pack
               # direct unpack of gz into working folder
-              # Update file
+              done = false
+
+              ## Pack
               if online
                 hosts = config[:hosts].clone
-                done = false
-
-                ## Pack
-                if online
-                  b = false
-                  until hosts.empty? || done do
-                    # FIXME: Nasty
-                    if b
-                      host = hosts.sample
-                      @logger.info "Trying #{host}"
-                    end
-                    slist = nil
-                    b = true
-                    hosts -= [host]
-
-                    # TODO: Progress bar
-                    arr_opts = []
-                    arr_opts << PARAMS
-                    arr_opts << @rsh if host[/^(\w)*\@/]
-
-                    if mismatch.size > (@repos_remote[typ].size / 2)
-                      # Process full folder
-                      @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
-                    else
-                      # Process only selective
-                      @logger.info "Fetching #{mismatch.size} files... Please wait"
-                      slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
-                      slist.gsub!("\\", "/")
-                      File.open(slist, 'w') { |f| mismatch.each { |e| f.puts e } }
-
-                      arr_opts << "--files-from=#{win2cyg("\"#{slist}\"")}"
-                    end
-
-                    begin
-                      arr_opts << esc(File.join(host, '.pack/.'))
-                      arr_opts << esc(pack_path)
-                      command('', arr_opts)
-
-                      done = true
-                    rescue => e
-                      @logger.warn "Failure"
-                      @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
-                    ensure
-                      FileUtils.rm_f slist if slist
-                    end
+                host = hosts.sample unless host
+                b = false
+                until hosts.empty? || done do
+                  # FIXME: Nasty
+                  if b
+                    host = hosts.sample
+                    @logger.info "Trying #{host}"
                   end
-                  @logger.warn "There was a problem during updating, please retry!" unless done
+                  slist = nil
+                  b = true
+                  hosts -= [host]
+
+                  # TODO: Progress bar
+                  arr_opts = []
+                  arr_opts << PARAMS
+                  arr_opts << @rsh if host[/^(\w)*\@/]
+
+                  if mismatch.size > (@repos_remote[typ].size / 2)
+                    # Process full folder
+                    @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
+                  else
+                    # Process only selective
+                    @logger.info "Fetching #{mismatch.size} files... Please wait"
+                    slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
+                    slist.gsub!("\\", "/")
+                    File.open(slist, 'w') { |f| mismatch.each { |e| f.puts e } }
+
+                    arr_opts << "--files-from=#{win2cyg("\"#{slist}\"")}"
+                  end
+
+                  begin
+                    arr_opts << esc(File.join(host, '.pack/.'))
+                    arr_opts << esc(pack_path)
+                    command('', arr_opts)
+
+                    done = true
+                  rescue => e
+                    @logger.warn "Failure"
+                    @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
+                  ensure
+                    FileUtils.rm_f slist if slist
+                  end
                 end
+                @logger.warn "There was a problem during updating, please retry!" unless done
               end
             when :wd
               mismatch.each_with_index do |e, index|
@@ -778,9 +772,41 @@ module Six
         def run_command(rsync_cmd, &block)
           # TODO: Make this switchable? Verbosity ?
           # Or actually parse this live for own stats?
-          s = nil
           out = ''
+          buff = []
+          status = Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
+            io_out.each_byte do |buffer|
+              char = buffer.chr
+              buff << char
+              if ["\n", "\r"].include?(char)
+                b = buff.join("")
+                process_msg b
+                out << b
+                buff = []
+              end
+            end
 
+            io_err.each do |line|
+              case line
+              when /max connections \((.*)\) reached/
+                @logger.warn "Server reached maximum connections."
+              end
+              err << line
+            end
+          end
+
+          unless buff.empty?
+            b = buff.join("")
+            process_msg b
+            out << b
+          end
+
+          if status > 0
+            return out if status == 1 && out == ''
+            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + err + ':' + out)
+          end
+
+=begin
           # Simpler method but on windows the !? exitstatus is not working properly..
           # Does nicely display error output in logwindow though
           io = IO.popen(rsync_cmd)
@@ -792,37 +818,13 @@ module Six
           #  process_msg buffer
           #  out << buffer
           #end
-
-          buff = []
-          io.each_byte do |buffer|
-            buffer = buffer.chr
-            buff << buffer
-            if ["\n", "\r"].include?(buffer)
-              b = buff.join("")
-              process_msg b
-              out << b
-              buff = []
-            end
-          end
-
-          unless buff.empty?
-            b = buff.join("")
-            process_msg b
-            out << b
-          end        
-
           out[/rsync error: .* \(code ([0-9]*)\)/]
           status = $1 ? $1.to_i : 0
-
-          if status > 0
-            return '' if status == 1 && out == ''
             case out
-              when /max connections \((.*)\) reached/ 
+              when /max connections \((.*)\) reached/
                 @logger.warn "Server reached maximum connections."
-            end
-            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + out)
-          end
-
+            end          
+=end
           STDOUT.sync = false unless STDOUT.sync == oldsync
 
           status

@@ -3,17 +3,13 @@
 require 'fileutils'
 require 'digest/md5'
 require 'yaml'
+require 'open3'
 
-BASE_PATH = Dir.pwd
 require 'six/rsync/path'
 require 'six/rsync/repository'
 require 'six/rsync/working_directory'
 require 'six/rsync/lib'
 require 'six/rsync/base'
-#require 'six/popen'
-
-require 'open3'
-#require 'win32/open3'
 
 case RUBY_VERSION
 when /1\.8\.[0-9]/
@@ -32,7 +28,7 @@ module Six
     module Rsync
       COMPONENT = 'six-rsync'
       VERSION = '0.6.0'
-      FOLDER = /(.*)\/(.*)/
+      BASE_PATH = Dir.pwd      
 
       case RUBY_PLATFORM
         when /-mingw32$/, /-mswin32$/
