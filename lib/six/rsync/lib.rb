@@ -351,8 +351,7 @@ module Six
                 arr_opts << esc(File.join(host, '.pack/.'))
                 arr_opts << esc(pack_path)
                 command(cmd, arr_opts)
-                calc
-                save_repos
+                load_repos(:remote)
                 done = true
               rescue => e
                 @logger.debug "#{e.class}: #{e.message} #{e.backtrace.join("\n")}"
@@ -360,6 +359,8 @@ module Six
             end
             #@verbose = verbose
             if done
+              calc
+              save_repos
               @logger.info "Verifying Unpacked files..."
               compare_set(:wd)
             else
