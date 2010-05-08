@@ -559,10 +559,7 @@ module Six
         end
 
         def fetch_file(path, host)
-          path[/(.*)\/(.*)/]
-          folder, file = $1, $2
-          folder = "." unless folder
-          file = path unless file
+          folder = File.dirname(path)
           # Only fetch a specific file
           @logger.debug "Fetching #{path} from  #{host}"
           arr_opts = []
@@ -713,9 +710,7 @@ module Six
             # TODO: Evaluate if this is actually wanted / useful at all..
 =begin
             if file[/\.tar\.?/]
-              file[/(.*)\/(.*)/]
-              fil = $2
-              fil = file unless fil
+              fil = File.basename(file)
               f2 = fil.gsub('.gz', '')
               zip7(f2)
               FileUtils.rm_f f2
@@ -736,9 +731,8 @@ module Six
               relative = file.clone
               relative.gsub!(@rsync_work_dir, '')
               relative.gsub!(/^[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/, '')
-              fil = relative
-              folder = "."
-              folder, fil = $1, $2 if relative[/(.*)\/(.*)/]
+              folder = File.dirname(relative)
+              fil = File.basename(relative)
               #puts "Relative: #{relative}, Folder: #{folder}, File: #{fil} (Origin: #{file})"
 
               path = File.join(@rsync_work_dir, folder)
