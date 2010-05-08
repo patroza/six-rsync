@@ -770,8 +770,6 @@ module Six
         end
 
         def run_command(rsync_cmd, &block)
-          # TODO: Make this switchable? Verbosity ?
-          # Or actually parse this live for own stats?
           out = ''
           buff = []
           status = Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
@@ -802,9 +800,14 @@ module Six
           end
 
           if status > 0
-            return out if status == 1 && out == ''
+            #return 0 if status == 1 && out == ''
             raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + err + ':' + out)
           end
+
+          STDOUT.sync = false unless STDOUT.sync == oldsync
+
+          status
+        end
 
 =begin
           # Simpler method but on windows the !? exitstatus is not working properly..
@@ -823,12 +826,8 @@ module Six
             case out
               when /max connections \((.*)\) reached/
                 @logger.warn "Server reached maximum connections."
-            end          
+            end
 =end
-          STDOUT.sync = false unless STDOUT.sync == oldsync
-
-          status
-        end
 
         def process_msg(msg)
           if msg[/\r/] #msg[/[k|m|g]?B\/s/i]
