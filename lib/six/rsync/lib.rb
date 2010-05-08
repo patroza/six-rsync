@@ -88,6 +88,16 @@ module Six
               @logger.info "Removed: #{key}"
             end
           end
+
+          @repos_local[:pack].each_pair do |key, value|
+            i += 1
+            localkey = "#{key}"
+            localkey.gsub!(/\.gz$/, "")
+            if @repos_local[:wd][localkey].nil?
+              @logger.info "Removed: #{key}"
+            end
+          end
+
         end
 
         def init
@@ -221,6 +231,21 @@ module Six
             end
           end
 
+          @repos_local[:pack].each_pair do |key, value|
+            i += 1
+            localkey = "#{key}"
+            localkey.gsub!(/\.gz$/, "")
+            if @repos_local[:wd][localkey].nil?
+              @logger.info "Removing: #{key}"
+
+              change = true
+              file = pack_path(key)
+              @repos_local[:pack].delete key
+              FileUtils.rm_f(file) if File.exists?(file)
+            end
+          end
+          
+
           if change
             @logger.info "Changes found!"
             save_repos(:local)
@@ -346,6 +371,9 @@ module Six
               save_repos
               @logger.info "Verifying Unpacked files..."
               compare_set(:wd)
+              # Bump version and make final save
+              @repos_local[:version] = @repos_remote[:version]
+              save_repos
             else
               @logger.warn "Exhausted all mirrors, please retry!"
               raise RsyncError
