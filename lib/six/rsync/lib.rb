@@ -264,17 +264,13 @@ module Six
           handle_hosts
 
           host = config[:hosts].sample unless host
-          # TODO: UNCLUSTERFUCK
           arr_opts = []
           arr_opts << PARAMS
-
-          # Upload .pack changes
-          if host[/^(\w)*\@/]
-            arr_opts << @rsh
-          end
+          arr_opts << @rsh if host[/^(\w)*\@/]
           arr_opts << esc(pack_path('.'))
           arr_opts << esc(File.join(host, '.pack'))
 
+          # Upload .pack changes
           command('', arr_opts)
         end
 
@@ -296,21 +292,8 @@ module Six
           arr_opts = []
           arr_opts << "-I" if opts[:force]
 
-          begin
-            init
-            begin
-              update('', arr_opts, {:force => true})
-            rescue RsyncError => e
-              #@logger.error "Unable to sucessfully update... (#{e.class}: #{e.message})"
-              #@logger.debug e.backtrace.join("\n")
-            end
-          rescue => e
-            @logger.error "Unable to initialize (#{e.class}: #{e.message})"
-            @logger.debug e.backtrace.join("\n")
-            #FileUtils.rm_rf @rsync_work_dir if File.exists?(@rsync_work_dir)
-            raise RsyncError
-          end
-
+          init
+          update('', arr_opts, {:force => true})
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
 
@@ -364,6 +347,7 @@ module Six
               @logger.info "Verifying Unpacked files..."
               compare_set(:wd)
             else
+              @logger.warn "Exhausted all mirrors, please retry!"
               raise RsyncError
             end
           else
