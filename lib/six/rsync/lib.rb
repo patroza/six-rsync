@@ -428,7 +428,12 @@ module Six
             load_repos(:remote)
           end
 
-          if done && online
+          unless done
+            @logger.warn "Exhausted all mirrors, please retry!"
+            raise RsyncError
+          end
+
+          if online
             @logger.info "Verifying Packed files..."
             compare_set(:pack, host)
 
@@ -862,7 +867,7 @@ module Six
                 msg = buff.join("")
                 print msg if @verbose
               end
-              pid, status = $?.pid, $?.status
+              pid, status = $?.pid, $?.exitstatus
           end
 
 
