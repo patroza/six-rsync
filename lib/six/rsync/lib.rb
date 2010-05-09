@@ -803,6 +803,7 @@ module Six
           STDOUT.sync = true
           cmd = case RUBY_PLATFORM
             when /-mingw32$/, /-mswin32$/
+              rsync_cmd.gsub!("\"", "\\\"" )
               "ruby \"#{File.join(File.dirname(__FILE__), "..", "wrapper.rb")}\" #{rsync_cmd}"
             else
               rsync_cmd

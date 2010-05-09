@@ -13,4 +13,5 @@ rescue => e
   rescue => e
       puts "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
   end
+  Process.exit(1) # Return error-1
 end
