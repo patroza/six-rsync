@@ -859,9 +859,10 @@ module Six
               end
 
               if shebang
-                shebang[/^SIX-SHEBANG: (-?.*), (-?.*)/]
-                pid = $1.to_i if $1
-                status = $2.to_i if $2
+                if shebang[/^SIX-SHEBANG: (-?.*), (-?.*)/]
+                  pid = $1.to_i if $1
+                  status = $2.to_i if $2
+                end
               end
             else
               # Handle last bits in the buffer
