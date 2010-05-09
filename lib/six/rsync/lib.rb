@@ -226,7 +226,7 @@ module Six
 
               @logger.info "Removing: #{packed}"
               @repos_local[:wd].delete key
-              @repos_local[:pack].delete packed              
+              @repos_local[:pack].delete packed
               FileUtils.rm_f(file) if File.exists?(file)
             end
           end
@@ -244,7 +244,7 @@ module Six
               FileUtils.rm_f(file) if File.exists?(file)
             end
           end
-          
+
 
           if change
             @logger.info "Changes found!"
@@ -307,10 +307,10 @@ module Six
           @logger = opts[:log] if opts[:log]
 
           case repository
-          when Array
-            config[:hosts] += repository
-          when String
-            config[:hosts] << repository
+            when Array
+              config[:hosts] += repository
+            when String
+              config[:hosts] << repository
           end
 
           # TODO: Eval move to update?
@@ -459,67 +459,67 @@ module Six
 
           if mismatch.size > 0
             case typ
-            when :pack
-              # direct unpack of gz into working folder
-              done = false
+              when :pack
+                # direct unpack of gz into working folder
+                done = false
 
-              ## Pack
-              if online
-                hosts = config[:hosts].clone
-                host = hosts.sample unless host
-                b, i = false, 0
-                until hosts.empty? || done do
-                  i += 1
-                  # FIXME: Nasty
-                  if b
-                    host = hosts.sample
-                    @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
+                ## Pack
+                if online
+                  hosts = config[:hosts].clone
+                  host = hosts.sample unless host
+                  b, i = false, 0
+                  until hosts.empty? || done do
+                    i += 1
+                    # FIXME: Nasty
+                    if b
+                      host = hosts.sample
+                      @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
+                    end
+                    slist = nil
+                    b = true
+                    hosts -= [host]
+
+                    # TODO: Progress bar
+                    arr_opts = []
+                    arr_opts << PARAMS
+                    arr_opts << @rsh if host[/^(\w)*\@/]
+
+                    if mismatch.size > (@repos_remote[typ].size / 2)
+                      # Process full folder
+                      @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
+                    else
+                      # Process only selective
+                      @logger.info "Fetching #{mismatch.size} files... Please wait"
+                      slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
+                      slist.gsub!("\\", "/")
+                      File.open(slist, 'w') { |f| mismatch.each { |e| f.puts e } }
+
+                      arr_opts << "--files-from=#{win2cyg("\"#{slist}\"")}"
+                    end
+
+                    begin
+                      arr_opts << esc(File.join(host, '.pack/.'))
+                      arr_opts << esc(pack_path)
+                      command('', arr_opts)
+
+                      done = true
+                    rescue => e
+                      @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
+                    ensure
+                      FileUtils.rm_f slist if slist
+                    end
                   end
-                  slist = nil
-                  b = true
-                  hosts -= [host]
-
-                  # TODO: Progress bar
-                  arr_opts = []
-                  arr_opts << PARAMS
-                  arr_opts << @rsh if host[/^(\w)*\@/]
-
-                  if mismatch.size > (@repos_remote[typ].size / 2)
-                    # Process full folder
-                    @logger.info "Many files mismatched (#{mismatch.size}), running full update on .pack folder"
-                  else
-                    # Process only selective
-                    @logger.info "Fetching #{mismatch.size} files... Please wait"
-                    slist = File.join(TEMP_PATH, ".six-rsync_#{rand 9999}-list")
-                    slist.gsub!("\\", "/")
-                    File.open(slist, 'w') { |f| mismatch.each { |e| f.puts e } }
-
-                    arr_opts << "--files-from=#{win2cyg("\"#{slist}\"")}"
-                  end
-
-                  begin
-                    arr_opts << esc(File.join(host, '.pack/.'))
-                    arr_opts << esc(pack_path)
-                    command('', arr_opts)
-
-                    done = true
-                  rescue => e
-                    @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
-                  ensure
-                    FileUtils.rm_f slist if slist
+                  unless done
+                    @logger.warn "Exhausted all mirrors, please retry!"
+                    raise RsyncError
                   end
                 end
-                unless done
-                  @logger.warn "Exhausted all mirrors, please retry!"
-                  raise RsyncError
+              when :wd
+                mismatch.each_with_index do |e, index|
+                  # TODO: Nicer progress bar...
+                  @logger.info "Unpacking #{index + 1}/#{mismatch.size}: #{e}"
+                  unpack(:path => "#{e}.gz")
                 end
-              end
-            when :wd
-              mismatch.each_with_index do |e, index|
-                # TODO: Nicer progress bar...
-                @logger.info "Unpacking #{index + 1}/#{mismatch.size}: #{e}"
-                unpack(:path => "#{e}.gz")
-              end
             end
           end
 
@@ -608,12 +608,12 @@ module Six
           @logger.debug "Calculating checksums of #{typ} files"
           ar = []
           reg = case typ
-          when :pack
-            ar = Dir[pack_path('**/*')]
-            /^[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
-          when :wd
-            ar = Dir[File.join(@rsync_work_dir, '/**/*')]
-            /^[\\|\/]/
+            when :pack
+              ar = Dir[pack_path('**/*')]
+              /^[\\|\/]\.rsync[\\|\/]\.pack[\\|\/]/
+            when :wd
+              ar = Dir[File.join(@rsync_work_dir, '/**/*')]
+              /^[\\|\/]/
           end
           h = Hash.new
           ar.each do |file|
@@ -646,12 +646,12 @@ module Six
         def save_repos(typ = :local)
           file, config = nil, nil
           case typ
-          when :local
-            file = rsync_path('.repository.yml')
-            config = @repos_local.clone
-          when :remote
-            file = pack_path('.repository.yml')
-            config = @repos_remote.clone
+            when :local
+              file = rsync_path('.repository.yml')
+              config = @repos_local.clone
+            when :remote
+              file = pack_path('.repository.yml')
+              config = @repos_remote.clone
           end
           config[:pack] = config[:pack].sort
           config[:wd] = config[:wd].sort
@@ -660,10 +660,10 @@ module Six
 
         def load_repos(typ)
           config = case typ
-          when :local
-            YAML::load_file(rsync_path('.repository.yml'))
-          when :remote
-            YAML::load_file(pack_path('.repository.yml'))
+            when :local
+              YAML::load_file(rsync_path('.repository.yml'))
+            when :remote
+              YAML::load_file(pack_path('.repository.yml'))
           end
 
           [:wd, :pack].each do |t|
@@ -673,19 +673,19 @@ module Six
           end
 
           case typ
-          when :local
-            @repos_local = config
-          when :remote
-            @repos_remote = config
+            when :local
+              @repos_local = config
+            when :remote
+              @repos_remote = config
           end
         end
 
         def del_file(file, typ, opts = {})
           path = case typ
-          when :pack
-            File.join(@rsync_work_dir, DIR_PACK, file)
-          when :wd
-            File.join(@rsync_work_dir, file)
+            when :pack
+              File.join(@rsync_work_dir, DIR_PACK, file)
+            when :wd
+              File.join(@rsync_work_dir, file)
           end
           if File.exists?(path)
             FileUtils.rm_f File.join(path)
@@ -785,54 +785,105 @@ module Six
 
           @logger.debug(rsync_cmd) if @logger
 
-          out = chdir && (Dir.getwd != path) ? Dir.chdir(path) { run_command(rsync_cmd, &block) } : run_command(rsync_cmd, &block) 
+          out = chdir && (Dir.getwd != path) ? Dir.chdir(path) { run_command(rsync_cmd, &block) } : run_command(rsync_cmd, &block)
           out
         end
 
         def run_command(rsync_cmd, &block)
           out, err = '', ''
           buff = []
-          status = nil
+          #status = nil
+          shebang = nil
           oldsync = STDOUT.sync
           STDOUT.sync = true
+          cmd = case RUBY_PLATFORM
+            when /-mingw32$/, /-mswin32$/
+              "ruby \"#{File.join(File.dirname(__FILE__), "..", "wrapper.rb")}\" #{rsync_cmd}"
+            else
+              rsync_cmd
+          end
 
-          po = Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
+          po = IO.popen("#{cmd} 2>&1") do |io_out| #Open3.popen3(rsync_cmd) do |io_in, io_out, io_err, waitth|
+            #io_in.close
+            io_out.sync = true
             io_out.each_byte do |buffer|
               char = buffer.chr
               buff << char
               if ["\n", "\r"].include?(char)
-                b = buff.join("")
-                print b if @verbose                
-                out << b
+                msg = buff.join("")
+
+                case RUBY_PLATFORM
+                  when /-mingw32$/, /-mswin32$/
+                    if msg =~ /^SIX-SHEBANG: /
+                      shebang = msg
+                    else
+                      print msg if @verbose
+                    end
+                  else
+                    print msg if @verbose
+                end
+
+                out << msg
                 buff = []
               end
             end
 
-            io_err.each do |line|
-              print line
-              case line
-              when /max connections \((.*)\) reached/
-                @logger.warn "Server reached maximum connections."
+            #io_err.each do |line|
+            #  print line
+            #  case line
+            #  when /max connections \((.*)\) reached/
+            #    @logger.warn "Server reached maximum connections."
+            #  end
+            #  err << line
+            #end
+            #status = waitth.value
+          end
+
+          pid, status = nil, 1
+          case RUBY_PLATFORM
+            when /-mingw32$/, /-mswin32$/
+              # Handle last bits in the buffer
+              unless buff.empty?
+                msg = buff.join("")
+                if msg =~ /^SIX-SHEBANG: /
+                  shebang = msg
+                else
+                  print msg if @verbose
+                end
               end
-              err << line
-            end
-            status = waitth.value
+
+              if shebang
+                shebang[/^SIX-SHEBANG: ([0-9]*), ([0-9]*)/]
+                pid, status = $1.to_i, $2.to_i
+              end
+            else
+              # Handle last bits in the buffer
+              unless buff.empty?
+                msg = buff.join("")
+                print msg if @verbose
+              end
+              pid, status = $?.pid, $?.status
           end
 
-          unless buff.empty?
-            b = buff.join("")
-            print b if @verbose
-            out << b
-          end
 
-          @logger.debug "Status: #{status}"
+          @logger.debug "Pid: #{pid} Status: #{status}"
           @logger.debug "Err: #{err}" # TODO: Throw this into the info/error log?
           @logger.debug "Output: #{out}"
 
-          if status.exitstatus > 0
-            #return 0 if status.exitstatus == 1 && out == ''
-            raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + err + ':' + out)
+          if status > 0
+            case out
+              when /max connections \((.*)\) reached/
+                @logger.warn "Server reached maximum connections."
+            end
+            raise Rsync::RsyncExecuteError.new(rsync_cmd + ", [#{status}, #{pid}]" + ':' + out)
+            #messages << Log.new(:logsession_id => ses, :content => "Abnormal program termination. #{pid}: #{status}")
           end
+
+
+#          if status.exitstatus > 0
+          #return 0 if status.exitstatus == 1 && out == ''
+          #raise Rsync::RsyncExecuteError.new(rsync_cmd + ':' + err + ':' + out)
+          #end
 
           STDOUT.sync = false unless STDOUT.sync == oldsync
 

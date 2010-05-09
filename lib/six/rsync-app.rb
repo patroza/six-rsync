@@ -90,7 +90,7 @@ module Six
         if options[:logging]
           o_file = Log4r::FileOutputter.new "#{COMPONENT}-file",
                                             'level' => 0, # All
-                                            :filename => File.join(DATA_PATH, 'logs', "#{COMPONENT}-file"),
+                                            :filename => File.join(DATA_PATH, 'logs', "#{COMPONENT}.log"),
                                             'formatter' =>  format2
           #:maxsize => 1024
           @@log.outputters << o_file
