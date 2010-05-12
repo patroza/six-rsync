@@ -27,7 +27,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.6.6'
+      VERSION = '0.6.9'
       BASE_PATH = Dir.pwd      
 
       case RUBY_PLATFORM
@@ -84,6 +84,11 @@ module Six
       #   :index => '/path/to/alt_index_file'
       def self.open(working_dir, options = {})
         Base.open(working_dir, options)
+      end
+
+      # Converts into repository
+      def self.convert(working_dir = '.', options = {})
+        Base.convert(working_dir, options)
       end
 
       # initialize a new rsync repository, defaults to the current working directory

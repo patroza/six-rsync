@@ -72,6 +72,14 @@ module Six
 #          end
           Six::Repositories::Rsync.init(folder, :log => Six::Repositories::Rsync.logger)
         end
+
+        def self.convert(folder)
+#          if File.exists?(folder)
+#            logger.error "#{folder} already exists!"
+#            Process.exit
+#          end
+          Six::Repositories::Rsync.convert(folder, :log => Six::Repositories::Rsync.logger)
+        end
       end
 
       unless defined?(Ocra)
@@ -116,7 +124,7 @@ module Six
         #app = App.new(ARGV[0])
         ARGV.each do |arg|
           todo.each do |option|
-            App.send option, arg
+            App.send option, "#{arg}"  # Unfreeze
           end
         end
       end

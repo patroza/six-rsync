@@ -37,6 +37,25 @@ module Six
           self.new(opts)
         end
 
+        def self.convert(working_dir, opts = {})
+          opts = {
+            :working_directory => working_dir,
+            :repository => File.join(working_dir, '.rsync')
+          }.merge(opts)
+
+          #FileUtils.mkdir_p(opts[:working_directory]) if opts[:working_directory] && !File.directory?(opts[:working_directory])
+
+          # run rsync_convert there
+          logger = if opts[:log]
+            opts[:log]
+          else
+            nil
+          end
+          Rsync::Lib.new(opts, logger).convert
+
+          self.new(opts)
+        end
+
         # clones a rsync repository locally
         #
         #  repository - http://repo.or.cz/w/sinatra.git

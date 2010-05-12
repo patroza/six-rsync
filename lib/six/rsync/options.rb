@@ -36,6 +36,10 @@ module Six
             todo << :commit if bool
           end
 
+          opts.on("-n", "--convert", "Converts into repository") do |bool|
+            todo << :convert if bool
+          end
+
           opts.on("--clone S", String, "Clones a Repository") do |s|
             todo << :clone
             @@host = s

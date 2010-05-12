@@ -54,6 +54,9 @@ module Six
             @rsync_dir = base[:repository]
             @rsync_work_dir = base[:working_directory]
           end
+
+          @rsync_dir.gsub!("\\", "/") if @rsync_dir
+          @rsync_work_dir.gsub!("\\", "/") if @rsync_work_dir
         end
 
         def status
@@ -97,19 +100,25 @@ module Six
               @logger.info "Removed: #{key}"
             end
           end
-
         end
 
-        def init
+        def convert
+          init({:force => true})
+          bla(".")
+        end
+
+        def init(opts = {})
           @logger.info "Processing: #{rsync_path}"
           if File.exists? rsync_path
             @logger.error "Seems to already be an Rsync repository, Aborting!"
             raise RsyncError
           end
-          if File.exists? @rsync_work_dir
-            unless Dir[File.join(@rsync_work_dir, '*')].empty?
-              @logger.error "Folder not empty, Aborting!"
-              raise RsyncError
+          unless opts[:force]
+            if File.exists? @rsync_work_dir
+              unless Dir[File.join(@rsync_work_dir, '*')].empty?
+                @logger.error "Folder not empty, Aborting!"
+                raise RsyncError
+              end
             end
           end
           FileUtils.mkdir_p pack_path
@@ -133,6 +142,9 @@ module Six
         def add(file)
           @logger.error "Please use commit instead!"
           return
+        end
+
+        def bla(file)
           @logger.info "Adding #{file}"
           if (file == ".")
             load_repos(:remote)
@@ -151,13 +163,20 @@ module Six
                   change = true
                   @logger.info "Packing #{i + 1}/#{ar.size}: #{file}"
                   gzip(file)
+                  FileUtils.mkdir_p(File.dirname(pack_path(relative))) unless File.exists?(File.dirname(pack_path(relative)))
+                  checksum2 = md5("#{file}.gz")
                   @repos_remote[:wd][relative] = checksum
-                  @repos_remote[:pack]["#{relative}.gz"] = md5("#{file}.gz")
+                  @repos_remote[:pack]["#{relative}.gz"] = checksum2
+                  @repos_local[:wd][relative] = checksum
+                  @repos_local[:pack]["#{relative}.gz"] = checksum2
                   FileUtils.mv("#{file}.gz", pack_path("#{relative}.gz"))
                 end
               end
             end
-            save_repos if change
+            if change
+              save_repos
+              save_repos(:remote)
+            end
           else
 
           end
