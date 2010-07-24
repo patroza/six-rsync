@@ -337,7 +337,12 @@ module Six
           arr_opts << "-I" if opts[:force]
 
           init
-          update('', arr_opts, {:force => true})
+          config[:include] = opts[:include] if opts.keys.include?(:include)
+          config[:exclude] = opts[:exclude] if opts.keys.include?(:exclude)
+          config[:hosts] = opts[:hosts] if opts.keys.include?(:hosts)
+          save_config(config)
+
+          update('', arr_opts, opts.merge({:force => true}))
           opts[:bare] ? {:repository => @rsync_work_dir} : {:working_directory => @rsync_work_dir}
         end
 
@@ -346,6 +351,10 @@ module Six
 
           handle_config
           handle_hosts
+          config[:hosts] = opts[:hosts] if opts.keys.include?(:hosts)
+          config[:include] = opts[:include] if opts.keys.include?(:include)
+          config[:exclude] = opts[:exclude] if opts.keys.include?(:exclude)
+          save_config(config)
 
           load_repos(:local)
           begin
@@ -358,7 +367,9 @@ module Six
           hosts = config[:hosts].clone
           host = hosts.sample
 
-          if opts[:force]
+          man = false
+          man = true if !opts[:include].nil? && !opts[:include].empty?
+          if opts[:force] && !man
             done = false
             b, i = false, 0
             #verbose = @verbose
@@ -565,17 +576,13 @@ module Six
         def include_match(key, typ)
           return true if config[:include].empty?
           config[:include].each do |i|
-            puts i
             if typ == :pack
               key = key.sub(/\.gz$/, "")
             end
-            puts key
             case i
               when /^*\.(\S*)$/
-                puts "yay!"
                 return true if key =~ /\.#{$1}$/
               when /^(\S*)\.*/
-                puts "yay!"
                 return true if key =~ /^#{$1}\./
             end
           end

@@ -94,8 +94,8 @@ module Six
 
         end
 
-        def update
-          lib.update('')
+        def update(opts = {})
+          lib.update('', [], opts)
         end
 
         def reset(opts = {})
