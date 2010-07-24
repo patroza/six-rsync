@@ -1,4 +1,5 @@
 # encoding: UTF-8
+#begin; require 'faster_require'; rescue LoadError; end if RUBY_PLATFORM =~ /cygwin|mingw|win32/
 
 require 'fileutils'
 require 'digest/md5'
@@ -27,7 +28,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.6.9'
+      VERSION = '0.7.0'
       BASE_PATH = Dir.pwd      
 
       case RUBY_PLATFORM

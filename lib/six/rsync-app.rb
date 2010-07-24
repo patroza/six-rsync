@@ -114,6 +114,8 @@ module Six
 
         @@log.outputters << o_out << o_err
 
+        puts "six-rsync by Sickboy <sb_at_dev-heaven.net> v#{Six::Repositories::Rsync::VERSION}"
+
         if ARGV.empty?
           ARGV << Dir.pwd
           #logger.error "Using current folder"
