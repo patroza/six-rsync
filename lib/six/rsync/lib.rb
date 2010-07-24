@@ -13,7 +13,7 @@ module Six
         attr_accessor :verbose
         PROTECTED = false
         WINDRIVE = /\"(\w)\:/
-        DEFAULT_CONFIG = {:hosts => [], :exclude => []}.to_yaml
+        DEFAULT_CONFIG = {:hosts => [], :exclude => [], :include => []}.to_yaml
         DEFAULT_TIMEOUT = 60
         PARAMS = if PROTECTED
           "--dry-run --times -O --no-whole-file -r --delete --progress -h --exclude=.rsync"
@@ -473,6 +473,7 @@ module Six
 
           mismatch = []
           @repos_remote[typ].each_pair do |key, value|
+            next unless include_match(key, typ)
             if value == @repos_local[typ][key]
               #@logger.info "Match! #{key}"
             else
@@ -548,6 +549,7 @@ module Six
           end
 
           @repos_local[typ].each_pair do |key, value|
+            next unless include_match(key, typ)
             del_file(key, typ) unless config[:exclude].include?(key) || !@repos_remote[typ][key].nil?
           end
 
@@ -560,6 +562,26 @@ module Six
 
 
         private
+        def include_match(key, typ)
+          return true if config[:include].empty?
+          config[:include].each do |i|
+            puts i
+            if typ == :pack
+              key = key.sub(/\.gz$/, "")
+            end
+            puts key
+            case i
+              when /^*\.(\S*)$/
+                puts "yay!"
+                return true if key =~ /\.#{$1}$/
+              when /^(\S*)\.*/
+                puts "yay!"
+                return true if key =~ /^#{$1}\./
+            end
+          end
+          return false
+        end
+
         def handle_config
           @config = load_config
           unless @config
@@ -596,6 +618,7 @@ module Six
         def config
           cfg = @config ||= YAML::load(DEFAULT_CONFIG)
           cfg[:exclude] = [] unless cfg[:exclude]
+          cfg[:include] = [] unless cfg[:include]
           cfg[:hosts] = [] unless cfg[:hosts]
           cfg
         end
@@ -645,6 +668,7 @@ module Six
             relative.gsub!(@rsync_work_dir, '')
             relative.gsub!(reg, '')
 
+            next unless include_match(relative, typ)
             next if config[:exclude].include?(relative)
             sum = md5(file)
             h[relative] = sum if sum
