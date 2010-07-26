@@ -364,23 +364,15 @@ module Six
             opts[:force] = true
           end
 
-          hosts = config[:hosts].clone
-          host = hosts.sample
+          hosts = h_hosts
 
           man = false
           man = true if !opts[:include].nil? && !opts[:include].empty?
           if opts[:force] && !man
             done = false
-            b, i = false, 0
-            #verbose = @verbose
-            #@verbose = false
-            until hosts.empty? || done do
-              i += 1
+            hosts.each_with_index do |host, i|
               # FIXME: Nasty
-              host = hosts.sample if b
-              b = true
-              hosts -= [host]
-              @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
+              @logger.info "Trying #{i + 1}/#{config[:hosts].size}: #{host}"
               begin
                 arr_opts = []
                 arr_opts << PARAMS
@@ -391,6 +383,7 @@ module Six
                 command(cmd, arr_opts)
                 load_repos(:remote)
                 done = true
+                break
               rescue => e
                 @logger.debug "#{e.class}: #{e.message} #{e.backtrace.join("\n")}"
               end
@@ -414,27 +407,31 @@ module Six
             save_repos
 
             # fetch latest sums and only update when changed
-            compare_sums(true, host)
+            compare_sums(true)
           end
         end
 
-        def compare_sums(online = true, host = config[:hosts].sample)
+        def h_hosts(host = nil)
+          hosts = config[:hosts].clone
+          unless host.nil?
+            hosts -= [host]
+            hosts = hosts.insert(0, host)
+          end
+          hosts
+        end
+
+        def compare_sums(online = true, host = nil)
           load_repos(:local)
           done = false
 
+          hosts = h_hosts(host)
+
           if online
-            hosts = config[:hosts].clone
-            b, i = false, 0
             verbose = @verbose
             @verbose = false
 
-            until hosts.empty? || done do
-              i += 1
-              # FIXME: Nasty
-              host = hosts.sample if b
-              b = true
-              hosts -= [host]
-              @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
+            hosts.each_with_index do |host, i|
+              @logger.info "Trying #{i + 1}/#{config[:hosts].size}: #{host}"
 
               begin
                 FileUtils.cp(pack_path(".repository.yml"), rsync_path(".repository-pack.yml")) if File.exists?(pack_path(".repository.yml"))
@@ -446,6 +443,7 @@ module Six
                   raise RsyncError
                 end
                 done = true
+                break
               rescue => e
                 @logger.debug "#{e.class} #{e.message}: #{e.backtrace.join("\n")}"
                 FileUtils.cp(rsync_path(".repository-pack.yml"), pack_path(".repository.yml")) if File.exists?(rsync_path(".repository-pack.yml"))
@@ -493,6 +491,8 @@ module Six
             end
           end
 
+          hosts = h_hosts(host)
+
           if mismatch.size > 0
             case typ
               when :pack
@@ -501,19 +501,10 @@ module Six
 
                 ## Pack
                 if online
-                  hosts = config[:hosts].clone
-                  host = hosts.sample unless host
-                  b, i = false, 0
-                  until hosts.empty? || done do
-                    i += 1
-                    # FIXME: Nasty
-                    if b
-                      host = hosts.sample
-                      @logger.info "Trying #{i}/#{config[:hosts].size}: #{host}"
-                    end
+                  hosts.each_with_index do |host, i|
+                    @logger.info "Trying #{i + 1}/#{config[:hosts].size}: #{host}"
+
                     slist = nil
-                    b = true
-                    hosts -= [host]
 
                     # TODO: Progress bar
                     arr_opts = []
@@ -539,6 +530,7 @@ module Six
                       command('', arr_opts)
 
                       done = true
+                      break
                     rescue => e
                       @logger.debug "ERROR: #{e.class} #{e.message} #{e.backtrace.join("\n")}"
                     ensure

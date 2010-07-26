@@ -28,7 +28,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.7.0'
+      VERSION = '0.7.1'
       BASE_PATH = Dir.pwd      
 
       case RUBY_PLATFORM
