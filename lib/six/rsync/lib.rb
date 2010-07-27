@@ -350,11 +350,11 @@ module Six
           @logger.debug "Checking for updates..."
 
           handle_config
-          handle_hosts
           config[:hosts] = opts[:hosts] if opts.keys.include?(:hosts)
           config[:include] = opts[:include] if opts.keys.include?(:include)
           config[:exclude] = opts[:exclude] if opts.keys.include?(:exclude)
           save_config(config)
+          handle_hosts
 
           load_repos(:local)
           begin
