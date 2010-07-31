@@ -161,6 +161,10 @@ module Six
           lib.status
         end
 
+        def info
+          lib.info
+        end
+
         # this is a convenience method for accessing the class that wraps all the
         # actual 'git' forked system calls.  At some point I hope to replace the Git::Lib
         # class with one that uses native methods or libgit C bindings

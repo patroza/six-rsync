@@ -59,6 +59,19 @@ module Six
           @rsync_work_dir.gsub!("\\", "/") if @rsync_work_dir
         end
 
+        def info
+          handle_config
+
+          load_repos(:local)
+          load_repos(:remote)
+
+          @logger.info "Repository #{@rsync_dir}"
+          @logger.info "Local Version #{@repos_local[:version]}"
+          @logger.info "Remote Version #{@repos_remote[:version]}"
+          @logger.info "Local WD File Count #{@repos_local[:wd].size}"
+          @logger.info "Remote WD File Count #{@repos_remote[:wd].size}"
+        end
+
         def status
           @logger.info "Showing changes on #{@rsync_work_dir}"
           handle_config

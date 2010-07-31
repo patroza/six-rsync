@@ -32,6 +32,12 @@ module Six
           @repo = Six::Repositories::Rsync.open(folder, :log => logger)
         end
 
+        def self.info(folder)
+          app = self.new(folder)
+          app.repo.info
+          app
+        end
+
         def self.open(folder)
           app = self.new(folder)
           app

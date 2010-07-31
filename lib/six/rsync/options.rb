@@ -45,6 +45,10 @@ module Six
             @@host = s
           end
 
+          opts.on("-o", "--info", "Shows information from repository") do |bool|
+            todo << :info
+          end
+
           opts.on("-l", "--log", "Write logfile") do |bool|
             options[:logging] = bool if bool
           end
