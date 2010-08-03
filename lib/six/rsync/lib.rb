@@ -122,6 +122,7 @@ module Six
         end
 
         def handle_case
+          return if CONFIG[:override_downcase]
           Six::Renamer.handle_downcase_f(@rsync_work_dir)
         end
 
