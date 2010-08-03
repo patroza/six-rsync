@@ -117,7 +117,12 @@ module Six
 
         def convert
           init({:force => true})
+          handle_case
           bla(".")
+        end
+
+        def handle_case
+          Six::Renamer.handle_downcase_f(@rsync_work_dir)
         end
 
         def init(opts = {})
@@ -224,6 +229,8 @@ module Six
 =end
 
           @logger.info "Calculating Checksums..."
+          handle_case
+
           @repos_local[:wd] = calc_sums(:wd)
           # Added or Changed files
           ar = Dir[File.join(@rsync_work_dir, '/**/*')]

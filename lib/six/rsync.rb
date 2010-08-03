@@ -6,6 +6,7 @@ require 'digest/md5'
 require 'yaml'
 require 'open3'
 
+require 'six/renamer'
 require 'six/rsync/path'
 require 'six/rsync/repository'
 require 'six/rsync/working_directory'
@@ -28,7 +29,7 @@ module Six
 
     module Rsync
       COMPONENT = 'six-rsync'
-      VERSION = '0.7.3'
+      VERSION = '0.8.0'
       BASE_PATH = Dir.pwd      
 
       case RUBY_PLATFORM
