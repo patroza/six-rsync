@@ -762,7 +762,7 @@ module Six
         end
 
         def md5(path)
-          unless @md5_installed ||= begin; %x[md5sum --help]; $? == 0; rescue; false; end
+          unless @md5_installed ||= begin; %x[md5sum --help]; $?.exitstatus == 0; rescue; false; end
             puts "md5sum command not found"
             raise RsyncError
           end
@@ -778,25 +778,25 @@ module Six
         end
 
         def zip7(file)
-          unless @zip7_installed ||= begin; %x[7z --help]; $? == 0; rescue; false; end
+          unless @zip7_installed ||= begin; %x[7z --help]; $?.exitstatus == 0; rescue; false; end
             puts "7z command not found"
             raise RsyncError
           end
           out = %x[7z x #{esc(file)} -y]
           @logger.debug out
-          raise RsyncError if $? != 0
+          raise RsyncError if $?.exitstatus != 0
           out
         end
 
         def gzip(file)
-          unless @gzip_installed ||= begin; %x[gzip --rsyncable --help]; $? == 0; rescue; false; end
+          unless @gzip_installed ||= begin; %x[gzip --rsyncable --help]; $?.exitstatus == 0; rescue; false; end
             puts "gzip command not found, or doesn't support --rsyncable"
             raise RsyncError
           end
           @logger.debug "Gzipping #{file}"
           out = %x[gzip -f --best --rsyncable --keep #{esc(file)}]
           @logger.debug out
-          raise RsyncError if $? != 0
+          raise RsyncError if $?.exitstatus != 0
           out
         end
 
