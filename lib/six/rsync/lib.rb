@@ -29,12 +29,12 @@ module Six
           @verbose = true
           @logger = logger
 
+          key = CONFIG[:key].nil? ? "" : CONFIG[:key]
           case RUBY_PLATFORM
             when /-mingw32$/, /-mswin32$/
-              key = CONFIG[:key] ? CONFIG[:key] : ""
-              @rsh = "-r --rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\""
+              @rsh = key[/\.ppk$/] ? "--rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\"" : "#{key.empty? ? "" : "-e \"ssh -i '#{key}'\""}"
             else
-              @rsh = ""
+              @rsh = "#{key.empty? ? "" : "-e \"ssh -i '#{key}'\""}"
           end
 
           # which rsync - should return on linux the bin location
