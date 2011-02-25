@@ -32,7 +32,7 @@ module Six
           key = CONFIG[:key].nil? ? "" : CONFIG[:key]
           case RUBY_PLATFORM
             when /-mingw32$/, /-mswin32$/
-              @rsh = key[/\.ppk$/] ? "--rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\"" : "#{key.empty? ? "" : "-e \"ssh -i '#{key}'\""}"
+              @rsh = key[/\.ppk$/] ? "--rsh=\"'cygnative.exe' plink.exe#{" -i #{key}" unless key.empty?}\"" : "#{key.empty? ? "" : "-e \"ssh -i '#{cyg_path(key)}'\""}"
             else
               @rsh = "#{key.empty? ? "" : "-e \"ssh -i '#{key}'\""}"
           end
@@ -57,6 +57,15 @@ module Six
 
           @rsync_dir.gsub!("\\", "/") if @rsync_dir
           @rsync_work_dir.gsub!("\\", "/") if @rsync_work_dir
+        end
+
+        def cyg_path(path)
+          path = path.clone
+          path.gsub!("\\", "/")
+          if path[/^([a-z]):/i]
+            path.sub!(/^([a-z]):/i, "/cygdrive/#{$1}")
+          end
+          path
         end
 
         def info
